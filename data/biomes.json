@@ -1,0 +1,45 @@
+{
+  "_comment": "Биомы. Источник: docs/RESEARCH.md, раздел «Мир и палитра бога». resources — id из resources.json; features — природные особенности, которых пока нет в списке ресурсов; materials — лучший материал строительства. Цвет — цвет пикселя карты (черновой). Вода задаётся высотой < 0, а не биомом.",
+  "materials": [
+    { "id": "wood", "name": "Дерево" },
+    { "id": "wood_stilts", "name": "Дерево на сваях" },
+    { "id": "stone", "name": "Камень" },
+    { "id": "brick", "name": "Кирпич" },
+    { "id": "adobe", "name": "Сырцовый кирпич" }
+  ],
+  "features": [
+    { "id": "game", "name": "Дичь" },
+    { "id": "berries", "name": "Ягоды" },
+    { "id": "farmland", "name": "Пашня" },
+    { "id": "pasture", "name": "Пастбища" },
+    { "id": "vineyard", "name": "Виноград" },
+    { "id": "peat", "name": "Торф" },
+    { "id": "reed", "name": "Камыш" },
+    { "id": "sand", "name": "Песок" },
+    { "id": "furs", "name": "Меха" },
+    { "id": "pearls", "name": "Жемчуг" }
+  ],
+  "biomes": [
+    { "id": "forest", "name": "Лес", "color": "#3f7a32",
+      "resources": ["wood"], "features": ["game", "berries"], "materials": ["wood"] },
+    { "id": "meadow", "name": "Луг / равнина", "color": "#7fb04a",
+      "resources": ["clay"], "features": ["farmland", "pasture"], "materials": ["wood", "brick"],
+      "note": "глина — у рек" },
+    { "id": "hills", "name": "Холмы", "color": "#9a9a5c",
+      "resources": ["stone"], "features": ["pasture", "vineyard"], "materials": ["stone"] },
+    { "id": "mountains", "name": "Горы", "color": "#8a837a",
+      "resources": ["stone", "iron_ore", "coal", "sulfur", "gold"], "features": [], "materials": ["stone"] },
+    { "id": "swamp", "name": "Болото", "color": "#55704c",
+      "resources": ["saltpeter"], "features": ["peat", "reed"], "materials": ["wood_stilts"],
+      "note": "камень и кирпич проседают (×0,5 HP)" },
+    { "id": "steppe", "name": "Пустыня / степь", "color": "#d6c27e",
+      "resources": ["saltpeter", "horses"], "features": ["sand"], "materials": ["adobe", "stone"],
+      "note": "деревянный город горит цепной реакцией" },
+    { "id": "taiga", "name": "Тайга / снег", "color": "#c9d6d2",
+      "resources": ["wood"], "features": ["furs"], "materials": ["wood"],
+      "note": "дерево — бревно" },
+    { "id": "coast", "name": "Побережье", "color": "#d9cf9a",
+      "resources": ["fish", "salt"], "features": ["pearls"], "materials": ["stone"],
+      "note": "сырость губит дерево: гниёт вдвое быстрее" }
+  ]
+}
