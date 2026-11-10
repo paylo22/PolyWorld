@@ -35,10 +35,10 @@ PolyWorld — песочница бога (как WorldBox) + средневек
 
 | Папка | Что там |
 | --- | --- |
-| `sim/` | симуляция и автозагрузки: GameClock, Defs, SaveLoad |
-| `view/` | отрисовка мира (сейчас — заглушка) |
+| `sim/` | симуляция и автозагрузки: GameClock, Defs, World, SaveLoad; WorldData, WorldGen |
+| `view/` | отрисовка мира (WorldView), камера, экран мира |
 | `ui/` | меню, панели, отладочная панель, тема |
-| `data/` | JSON с балансом: resources.json, biomes.json |
+| `data/` | JSON с балансом: resources.json, biomes.json, worldgen.json |
 | `assets/` | спрайты, звуки, шрифты |
 | `tests/` | тесты, `run_tests.gd` — раннер без окна |
 | `tools/` | скрипты для разработки (генераторы спрайтов, запуск тестов) |

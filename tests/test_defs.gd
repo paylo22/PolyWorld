@@ -22,6 +22,7 @@ func _real_texts() -> Dictionary:
 	return {
 		"resources.json": FileAccess.get_file_as_string("res://data/resources.json"),
 		"biomes.json": FileAccess.get_file_as_string("res://data/biomes.json"),
+		"worldgen.json": FileAccess.get_file_as_string("res://data/worldgen.json"),
 	}
 
 
@@ -145,3 +146,23 @@ func test_reload_clears_old_errors(t) -> void:
 	t.ok(not d.is_ok(), "сначала ошибки")
 	t.ok(d.load_dir("res://data"), "потом нормальная загрузка")
 	t.ok(d.is_ok(), "ошибки очищены")
+
+
+func test_worldgen_loaded(t) -> void:
+	var d := _defs()
+	d.load_dir("res://data")
+	t.eq(d.worldgen["size_default"], 256, "размер по умолчанию")
+	t.eq(d.biome_index("coast"), 7, "индекс побережья")
+	t.ok(d.get_resource("coal")["map_color"] is Color, "цвет жилы угля")
+
+
+func test_worldgen_bad_rule_biome(t) -> void:
+	var d := _defs()
+	d.load_from_texts(_patched("worldgen.json", func(data): data["biome_rules"][1]["biome"] = "volcano"))
+	t.has_text(_all_errors(d), "data/worldgen.json: biome_rules[1].biome — нет биома \"volcano\"", "правило с неизвестным биомом")
+
+
+func test_worldgen_bad_vein(t) -> void:
+	var d := _defs()
+	d.load_from_texts(_patched("worldgen.json", func(data): data["veins"][0]["resource"] = "mithril"))
+	t.has_text(_all_errors(d), "veins[0].resource — нет ресурса \"mithril\"", "жила неизвестного ресурса")
