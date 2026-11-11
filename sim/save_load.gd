@@ -1,31 +1,69 @@
 extends Node
 ## Сохранение и загрузка (автозагрузка SaveLoad).
 ##
-## Один файл user://saves/save.json (правило 12 CLAUDE.md). Внутри словарь:
-##   {"version": 1, "game_version": "0.1.0", "saved_at": "...", "clock": {...}}
-## Поле version — версия формата сохранения. Если формат меняется,
-## увеличь SAVE_VERSION и допиши перенос старых данных в _migrate().
+## Каждый мир — отдельный файл user://saves/<имя>.save, сжатый ZSTD.
+## Внутри две записи store_var подряд:
+##   1) шапка {"version", "game_version", "saved_at", "name", "seed", "size", "date"} —
+##      её одну читает список сохранений, не распаковывая весь мир;
+##   2) тело {"clock": {...}, "world": {...}} — слои мира как PackedInt32Array.
+## Поле version — версия формата. Сменил формат — увеличь SAVE_VERSION
+## и допиши перенос в _migrate().
 ##
-## Новые системы добавляют свои данные так: в build_save_dict() — ключ
-## со словарём от system.to_dict(), в apply_save_dict() — вызов from_dict().
+## Версия 1 (этап 0) была одним JSON без мира; такие файлы не читаются.
 
-const SAVE_VERSION := 1
-const DEFAULT_PATH := "user://saves/save.json"
+const SAVE_VERSION := 2
+const EXT := ".save"
 
-
-func has_save(path: String = DEFAULT_PATH) -> bool:
-	return FileAccess.file_exists(path)
+var saves_dir := "user://saves"
 
 
-## Сохраняет игру. Возвращает текст ошибки или "" если всё хорошо.
-func save_game(path: String = DEFAULT_PATH, clock: Node = null) -> String:
-	var data := build_save_dict(clock if clock else GameClock)
-	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+func has_saves() -> bool:
+	return not list_saves().is_empty()
+
+
+## Список сохранений, новые сверху. Каждый элемент — шапка файла плюс
+## "slot" (имя файла без расширения) и "modified" (время файла, unix).
+## Если файл не читается, в элементе есть "error".
+func list_saves() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not DirAccess.dir_exists_absolute(saves_dir):
+		return out
+	for f in DirAccess.get_files_at(saves_dir):
+		if not f.ends_with(EXT):
+			continue
+		var path := saves_dir.path_join(f)
+		var header := _read_header(path)
+		header["slot"] = f.get_basename()
+		header["modified"] = FileAccess.get_modified_time(path)
+		out.append(header)
+	out.sort_custom(func(a, b): return a["modified"] > b["modified"])
+	return out
+
+
+## Сохраняет текущий мир и часы в слот. Возвращает текст ошибки или "".
+## clock, world, defs — для тестов; по умолчанию автозагрузки.
+func save_game(slot: String, clock: Node = null, world: Node = null, defs: Node = null) -> String:
+	clock = clock if clock else GameClock
+	world = world if world else World
+	defs = defs if defs else Defs
+	if not world.has_world():
+		return "Нет мира для сохранения"
+	DirAccess.make_dir_recursive_absolute(saves_dir)
+	var path := saves_dir.path_join(slot + EXT)
 	var tmp := path + ".tmp"
-	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	var f := FileAccess.open_compressed(tmp, FileAccess.WRITE, FileAccess.COMPRESSION_ZSTD)
 	if f == null:
-		return "Не удалось открыть файл %s для записи: %s" % [tmp, error_string(FileAccess.get_open_error())]
-	f.store_string(JSON.stringify(data, "\t"))
+		return "Не удалось открыть %s для записи: %s" % [tmp, error_string(FileAccess.get_open_error())]
+	f.store_var({
+		"version": SAVE_VERSION,
+		"game_version": str(ProjectSettings.get_setting("application/config/version", "0.0.0")),
+		"saved_at": Time.get_datetime_string_from_system(false, true),
+		"name": world.world_name,
+		"seed": world.params.get("seed", 0),
+		"size": world.data.width,
+		"date": clock.get_date_string(),
+	})
+	f.store_var({"clock": clock.to_dict(), "world": world.to_dict(defs)})
 	f.close()
 	# Сначала пишем во временный файл, потом подменяем: если игра упадёт
 	# посреди записи, старое сохранение останется целым.
@@ -37,44 +75,67 @@ func save_game(path: String = DEFAULT_PATH, clock: Node = null) -> String:
 	return ""
 
 
-## Загружает игру. Возвращает текст ошибки или "" если всё хорошо.
-func load_game(path: String = DEFAULT_PATH, clock: Node = null) -> String:
+## Загружает слот. Возвращает текст ошибки или "".
+func load_game(slot: String, clock: Node = null, world: Node = null, defs: Node = null) -> String:
+	clock = clock if clock else GameClock
+	world = world if world else World
+	defs = defs if defs else Defs
+	var path := saves_dir.path_join(slot + EXT)
 	if not FileAccess.file_exists(path):
 		return "Сохранение не найдено: %s" % path
-	var text := FileAccess.get_file_as_string(path)
-	var json := JSON.new()
-	if json.parse(text) != OK:
-		return "%s, строка %d: файл повреждён — %s" % [path, json.get_error_line() + 1, json.get_error_message()]
-	if not json.data is Dictionary:
-		return "%s: ожидается объект {...} в корне файла" % path
-	return apply_save_dict(json.data, clock if clock else GameClock)
+	var f := FileAccess.open_compressed(path, FileAccess.READ, FileAccess.COMPRESSION_ZSTD)
+	if f == null:
+		return "Не удалось открыть %s: %s" % [path, error_string(FileAccess.get_open_error())]
+	var header = f.get_var()
+	var err := check_header(header)
+	if err != "":
+		return err
+	var body = f.get_var()
+	f.close()
+	if not body is Dictionary:
+		return "%s: файл повреждён (нет данных мира)" % path
+	body = _migrate(body, int(header["version"]))
+	if not body.get("clock") is Dictionary or not body.get("world") is Dictionary:
+		return "%s: файл повреждён (нет раздела clock или world)" % path
+	err = world.from_dict(body["world"], defs)
+	if err != "":
+		return err
+	return clock.from_dict(body["clock"])
 
 
-func build_save_dict(clock: Node) -> Dictionary:
-	return {
-		"version": SAVE_VERSION,
-		"game_version": str(ProjectSettings.get_setting("application/config/version", "0.0.0")),
-		"saved_at": Time.get_datetime_string_from_system(),
-		"clock": clock.to_dict(),
-	}
+func delete_save(slot: String) -> String:
+	var path := saves_dir.path_join(slot + EXT)
+	if not FileAccess.file_exists(path):
+		return "Сохранение не найдено: %s" % path
+	var err := DirAccess.remove_absolute(path)
+	return "" if err == OK else "Не удалось удалить %s: %s" % [path, error_string(err)]
 
 
-## Применяет словарь сохранения. Возвращает текст ошибки или "".
-func apply_save_dict(data: Dictionary, clock: Node) -> String:
-	var v = data.get("version")
+## Проверяет шапку. Возвращает текст ошибки или "".
+func check_header(header) -> String:
+	if not header is Dictionary:
+		return "Файл не похож на сохранение PolyWorld"
+	var v = header.get("version")
 	if not (v is int or v is float):
 		return "В сохранении нет поля version"
-	var version := int(v)
-	if version > SAVE_VERSION:
-		return "Сохранение из более новой версии игры (формат %d, эта версия понимает до %d)" % [version, SAVE_VERSION]
-	if version < 1:
-		return "Неверная версия сохранения: %d" % version
-	data = _migrate(data, version)
-	if not data.get("clock") is Dictionary:
-		return "В сохранении нет раздела clock"
-	return clock.from_dict(data["clock"])
+	if int(v) > SAVE_VERSION:
+		return "Сохранение из более новой версии игры (формат %d, эта версия понимает до %d)" % [int(v), SAVE_VERSION]
+	if int(v) < SAVE_VERSION:
+		return "Сохранение старого формата %d, его нельзя загрузить (нужен %d)" % [int(v), SAVE_VERSION]
+	return ""
 
 
-## Перенос старых форматов в текущий. Пока формат один — ничего не делает.
-func _migrate(data: Dictionary, _from_version: int) -> Dictionary:
-	return data
+func _read_header(path: String) -> Dictionary:
+	var f := FileAccess.open_compressed(path, FileAccess.READ, FileAccess.COMPRESSION_ZSTD)
+	if f == null:
+		return {"error": "файл не открывается"}
+	var header = f.get_var()
+	var err := check_header(header)
+	if err != "":
+		return {"error": err}
+	return header
+
+
+## Перенос старых форматов в текущий. Пока перенос не нужен.
+func _migrate(body: Dictionary, _from_version: int) -> Dictionary:
+	return body

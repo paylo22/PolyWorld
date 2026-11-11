@@ -2,7 +2,8 @@ extends Control
 ## Главное меню: «Новый мир», «Загрузить», номер версии.
 ## Если в data/*.json ошибка, показывает её и не пускает в игру.
 
-const WORLD_SCENE := "res://view/world_placeholder.tscn"
+const NEW_WORLD_SCENE := "res://ui/new_world.tscn"
+const LOAD_SCENE := "res://ui/load_menu.tscn"
 
 @onready var _new_btn: Button = %NewWorldButton
 @onready var _load_btn: Button = %LoadButton
@@ -21,21 +22,15 @@ func _ready() -> void:
 		_new_btn.disabled = true
 		_load_btn.disabled = true
 		return
-	_load_btn.disabled = not SaveLoad.has_save()
+	_load_btn.disabled = not SaveLoad.has_saves()
 
 
 func _on_new_world() -> void:
-	GameClock.reset()
-	GameClock.set_paused(false)
-	get_tree().change_scene_to_file(WORLD_SCENE)
+	get_tree().change_scene_to_file(NEW_WORLD_SCENE)
 
 
 func _on_load() -> void:
-	var err := SaveLoad.load_game()
-	if err != "":
-		_show_error("Не удалось загрузить:\n" + err)
-		return
-	get_tree().change_scene_to_file(WORLD_SCENE)
+	get_tree().change_scene_to_file(LOAD_SCENE)
 
 
 func _show_error(text: String) -> void:
