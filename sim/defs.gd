@@ -11,7 +11,7 @@ extends Node
 const Schema = preload("res://sim/schema.gd")
 
 const DATA_DIR := "res://data"
-const FILES: Array[String] = ["resources.json", "biomes.json"]
+const FILES: Array[String] = ["resources.json", "biomes.json", "worldgen.json"]
 
 const RESOURCE_TYPES: Array[String] = [
 	"food_raw",      # еда-сырьё (зерно)
@@ -49,6 +49,8 @@ const SCHEMAS := {
 					"type": {"type": "enum", "values": RESOURCE_TYPES},
 					"storage": {"type": "id"},
 					"spoils": {"type": "bool", "optional": true},
+					# цвет жилы на карте (для ресурсов, которые лежат в земле)
+					"map_color": {"type": "color", "optional": true},
 					"source": {"type": "string"},
 					"uses": {"type": "string"},
 				},
@@ -80,6 +82,66 @@ const SCHEMAS := {
 			}},
 		},
 	},
+	"worldgen.json": {
+		"type": "object",
+		"fields": {
+			"size_min": {"type": "int", "min": 64, "max": 1024},
+			"size_max": {"type": "int", "min": 64, "max": 1024},
+			"size_step": {"type": "int", "min": 8},
+			"size_default": {"type": "int", "min": 64, "max": 1024},
+			"defaults": {"type": "object", "fields": {
+				"water": {"type": "int", "min": 0, "max": 100},
+				"mountains": {"type": "int", "min": 0, "max": 100},
+				"islands": {"type": "int", "min": 1, "max": 50},
+			}},
+			"limits": {"type": "object", "fields": {
+				"water_min": {"type": "int", "min": 0, "max": 100},
+				"water_max": {"type": "int", "min": 0, "max": 100},
+				"islands_min": {"type": "int", "min": 1, "max": 50},
+				"islands_max": {"type": "int", "min": 1, "max": 50},
+			}},
+			"height_frequency": {"type": "number", "min": 0.0001, "max": 1},
+			"height_octaves": {"type": "int", "min": 1, "max": 9},
+			"ridge_frequency": {"type": "number", "min": 0.0001, "max": 1},
+			"ridge_strength": {"type": "number", "min": 0, "max": 5},
+			"moisture_frequency": {"type": "number", "min": 0.0001, "max": 1},
+			"island_weight": {"type": "number", "min": 0, "max": 5},
+			"noise_weight": {"type": "number", "min": 0, "max": 5},
+			"hills_height": {"type": "int", "min": 1, "max": 999},
+			"mountain_height": {"type": "int", "min": 1, "max": 999},
+			"mountain_share_min": {"type": "number", "min": 0, "max": 0.5},
+			"mountain_share_max": {"type": "number", "min": 0, "max": 0.5},
+			"hills_ratio": {"type": "number", "min": 0, "max": 5},
+			"land_cells_per_river": {"type": "int", "min": 100},
+			"rivers_min": {"type": "int", "min": 0},
+			"rivers_max": {"type": "int", "min": 0},
+			"river_min_length": {"type": "int", "min": 1},
+			"river_moisture_radius": {"type": "int", "min": 0, "max": 32},
+			"river_moisture_bonus": {"type": "int", "min": 0, "max": 1000},
+			"water_moisture_radius": {"type": "int", "min": 0, "max": 32},
+			"water_moisture_bonus": {"type": "int", "min": 0, "max": 1000},
+			"clay_radius": {"type": "int", "min": 0, "max": 8},
+			"clay_chance": {"type": "number", "min": 0, "max": 1},
+			"veins_per_1000_mountain": {"type": "number", "min": 0},
+			"vein_size_min": {"type": "int", "min": 1},
+			"vein_size_max": {"type": "int", "min": 1},
+			"veins": {"type": "array", "min_items": 1, "item": {
+				"type": "object",
+				"fields": {"resource": {"type": "id"}, "weight": {"type": "number", "min": 0}},
+			}},
+			"biome_rules": {"type": "array", "min_items": 1, "item": {
+				"type": "object",
+				"fields": {
+					"biome": {"type": "id"},
+					"height_min": {"type": "int", "min": 1, "max": 1000, "optional": true},
+					"height_max": {"type": "int", "min": 1, "max": 1000, "optional": true},
+					"moisture_min": {"type": "int", "min": 0, "max": 1000, "optional": true},
+					"moisture_max": {"type": "int", "min": 0, "max": 1000, "optional": true},
+					"max_sea_distance": {"type": "int", "min": 1, "max": 64, "optional": true},
+				},
+			}},
+		},
+	},
 }
 
 var errors: PackedStringArray = []
@@ -92,6 +154,8 @@ var materials: Dictionary = {}
 var features: Dictionary = {}
 var biomes: Dictionary = {}
 var biome_ids: PackedStringArray = []
+## Настройки генерации мира (data/worldgen.json) как есть.
+var worldgen: Dictionary = {}
 
 
 func _ready() -> void:
@@ -166,6 +230,17 @@ func load_from_texts(texts: Dictionary, dir: String = DATA_DIR) -> bool:
 		_cross_check_biomes(parsed["biomes.json"], label_dir.path_join("biomes.json"),
 			res_ids, parsed.has("resources.json"))
 
+	if parsed.has("worldgen.json"):
+		var bids := []
+		if parsed.has("biomes.json"):
+			for b in parsed["biomes.json"]["biomes"]:
+				bids.append(b["id"])
+		var rids := []
+		if parsed.has("resources.json"):
+			for r in parsed["resources.json"]["resources"]:
+				rids.append(r["id"])
+		_cross_check_worldgen(parsed["worldgen.json"], label_dir.path_join("worldgen.json"), bids, rids)
+
 	if not errors.is_empty():
 		return false
 	_fill(parsed)
@@ -181,6 +256,7 @@ func _clear() -> void:
 	features = {}
 	biomes = {}
 	biome_ids = []
+	worldgen = {}
 
 
 func _cross_check_resources(data: Dictionary, label: String) -> void:
@@ -206,6 +282,28 @@ func _cross_check_biomes(data: Dictionary, label: String, res_ids: Array, check_
 			_check_refs(b["resources"], res_ids, label, p + ".resources", "ресурса", "data/resources.json")
 		_check_refs(b["features"], feat_ids, label, p + ".features", "особенности", "features")
 		_check_refs(b["materials"], mat_ids, label, p + ".materials", "материала", "materials")
+
+
+func _cross_check_worldgen(data: Dictionary, label: String, bids: Array, rids: Array) -> void:
+	if data["size_min"] > data["size_max"] or data["size_default"] < data["size_min"] or data["size_default"] > data["size_max"]:
+		errors.append("%s: size_min ≤ size_default ≤ size_max — нарушено" % label)
+	if data["hills_height"] >= data["mountain_height"]:
+		errors.append("%s: hills_height должна быть меньше mountain_height" % label)
+	if data["vein_size_min"] > data["vein_size_max"]:
+		errors.append("%s: vein_size_min больше vein_size_max" % label)
+	var rules: Array = data["biome_rules"]
+	for i in rules.size():
+		if not bids.is_empty() and not bids.has(rules[i]["biome"]):
+			errors.append("%s: biome_rules[%d].biome — нет биома \"%s\" (смотри data/biomes.json)" % [label, i, rules[i]["biome"]])
+	var last: Dictionary = rules[rules.size() - 1]
+	for k in ["height_min", "height_max", "moisture_min", "moisture_max", "max_sea_distance"]:
+		if last.has(k):
+			errors.append("%s: biome_rules — последнее правило должно быть без условий (биом по умолчанию), а в нём есть %s" % [label, k])
+			break
+	var veins: Array = data["veins"]
+	for i in veins.size():
+		if not rids.is_empty() and not rids.has(veins[i]["resource"]):
+			errors.append("%s: veins[%d].resource — нет ресурса \"%s\" (смотри data/resources.json)" % [label, i, veins[i]["resource"]])
 
 
 func _check_refs(values: Array, known: Array, label: String, path: String, what: String, where: String) -> void:
@@ -242,3 +340,17 @@ func _fill(parsed: Dictionary) -> void:
 		b["color"] = Color.html(b["color"])
 		biomes[b["id"]] = b
 		biome_ids.append(b["id"])
+	for r in resources.values():
+		if r.has("map_color"):
+			r["map_color"] = Color.html(r["map_color"])
+	worldgen = parsed["worldgen.json"]
+
+
+## Номер биома в biome_ids (так биом хранится в слое мира) или -1.
+func biome_index(id: String) -> int:
+	return biome_ids.find(id)
+
+
+## Номер ресурса в resource_ids (так жила хранится в слое мира) или -1.
+func resource_index(id: String) -> int:
+	return resource_ids.find(id)
