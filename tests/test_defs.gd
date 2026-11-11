@@ -166,3 +166,30 @@ func test_worldgen_bad_vein(t) -> void:
 	var d := _defs()
 	d.load_from_texts(_patched("worldgen.json", func(data): data["veins"][0]["resource"] = "mithril"))
 	t.has_text(_all_errors(d), "veins[0].resource — нет ресурса \"mithril\"", "жила неизвестного ресурса")
+
+
+func test_flora_and_palette_loaded(t) -> void:
+	var d := _defs()
+	t.ok(d.load_from_texts(_real_texts()), "данные без ошибок")
+	t.eq(d.flora_ids, PackedStringArray(["broadleaf", "conifer", "bush", "berries", "reed", "wild_grain"]), "6 видов флоры")
+	t.ok(d.flora["conifer"]["forest"] and not d.flora["bush"]["forest"], "лес отмечен")
+	t.ok(d.flora["reed"]["on_river"], "камыш растёт в реке")
+	t.ok(d.biomes["meadow"]["forest_spread"]["broadleaf"] > 0.0, "скорость леса на лугу")
+	t.eq(d.palette["brush_sizes"], [1, 3, 5, 9], "размеры кисти")
+	t.eq(d.palette["undo_strokes"], 10, "отмена 10 мазков")
+
+
+func test_flora_errors_name_field(t) -> void:
+	var d := _defs()
+	d.load_from_texts(_patched("biomes.json", func(x): x["biomes"][1]["forest_spread"]["oak"] = 0.5))
+	t.has_text(_all_errors(d), "biomes[1] «meadow».forest_spread", "неизвестная флора в скорости леса")
+	d.load_from_texts(_patched("biomes.json", func(x): x["biomes"][0]["forest_spread"]["conifer"] = 2))
+	t.has_text(_all_errors(d), "forest_spread.conifer — значение должно быть не больше 1", "шанс больше 1")
+	d.load_from_texts(_patched("biomes.json", func(x): x["flora"][2]["sprite"] = "nope.png"))
+	t.has_text(_all_errors(d), "flora[2] «bush».sprite — нет картинки", "нет картинки")
+	d.load_from_texts(_patched("biomes.json", func(x): x["palette"]["veins"].append("mithril")))
+	t.has_text(_all_errors(d), "data/biomes.json: palette.veins[4] — нет ресурса \"mithril\"", "жила из неизвестного ресурса")
+	d.load_from_texts(_patched("biomes.json", func(x): x["palette"]["veins"].append("bread")))
+	t.has_text(_all_errors(d), "palette.veins[4] — у ресурса \"bread\" нет map_color", "хлеб — не жила")
+	d.load_from_texts(_patched("biomes.json", func(x): x["palette"].erase("raise_step")))
+	t.has_text(_all_errors(d), "palette.raise_step — нет обязательного поля", "нет поля палитры")

@@ -256,11 +256,14 @@ func load_from_texts(texts: Dictionary, dir: String = DATA_DIR) -> bool:
 		_cross_check_resources(parsed["resources.json"], label_dir.path_join("resources.json"))
 	if parsed.has("biomes.json"):
 		var res_ids := []
+		var res_colors := []
 		if parsed.has("resources.json"):
 			for r in parsed["resources.json"]["resources"]:
 				res_ids.append(r["id"])
+				if r.has("map_color"):
+					res_colors.append(r["id"])
 		_cross_check_biomes(parsed["biomes.json"], label_dir.path_join("biomes.json"),
-			res_ids, parsed.has("resources.json"))
+			res_ids, parsed.has("resources.json"), res_colors)
 
 	if parsed.has("worldgen.json"):
 		var bids := []
@@ -306,7 +309,7 @@ func _cross_check_resources(data: Dictionary, label: String) -> void:
 				% [label, Schema.item_path("resources", i, r), r["storage"], ", ".join(PackedStringArray(storage_ids))])
 
 
-func _cross_check_biomes(data: Dictionary, label: String, res_ids: Array, check_res: bool) -> void:
+func _cross_check_biomes(data: Dictionary, label: String, res_ids: Array, check_res: bool, res_map_colors: Array = []) -> void:
 	var mat_ids := _unique_ids(data["materials"], "materials", label)
 	var feat_ids := _unique_ids(data["features"], "features", label)
 	_unique_ids(data["biomes"], "biomes", label)
@@ -333,6 +336,11 @@ func _cross_check_biomes(data: Dictionary, label: String, res_ids: Array, check_
 			% [label, pal["new_land_biome"], ", ".join(PackedStringArray(bids))])
 	if check_res:
 		_check_refs(pal["veins"], res_ids, label, "palette.veins", "ресурса", "data/resources.json")
+		for j in pal["veins"].size():
+			var rid: String = pal["veins"][j]
+			if res_ids.has(rid) and not res_map_colors.has(rid):
+				errors.append("%s: palette.veins[%d] — у ресурса \"%s\" нет map_color в data/resources.json, жилу не будет видно на карте"
+					% [label, j, rid])
 	var fl: Array = data["flora"]
 	for i in fl.size():
 		var sp := "res://assets/sprites/flora".path_join(fl[i]["sprite"])
