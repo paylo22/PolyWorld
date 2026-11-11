@@ -14,8 +14,12 @@ extends RefCounted
 ##   flags    — битовые флаги (FLAG_RIVER — река).
 ## Слои по правилу 3 CLAUDE.md; flags — дополнительно, для рек.
 ##
-## Любая правка через set_* помечает чанк «грязным», а WorldView
-## перерисовывает только такие чанки.
+## Любая правка через set_* помечает чанк «грязным» и запоминает прямоугольник
+## изменённых клеток в нём; WorldView перерисовывает только этот прямоугольник.
+##
+## Флора не влияет на цвет земли, поэтому set_flora не помечает чанк, а пишет
+## номер клетки в журнал флоры (кольцевой буфер). FloraView читает журнал со
+## своего места и обновляет только изменённые клетки.
 
 const CHUNK_SIZE := 64
 const ZONE_SIZE := 8
@@ -48,6 +52,15 @@ var zones_y: int = 0
 
 var _dirty := PackedByteArray()
 var _dirty_count: int = 0
+## Прямоугольник изменений чанка: x0, y0, x1, y1 (включительно) — по 4 числа на чанк.
+var _dirty_rect := PackedInt32Array()
+
+## Журнал изменений флоры: номера клеток в кольцевом буфере FLORA_LOG_SIZE.
+## flora_log_end — сколько записей сделано за всё время. Читатель хранит своё
+## место; если отстал больше чем на FLORA_LOG_SIZE — перечитывает всю флору.
+const FLORA_LOG_SIZE := 1 << 16
+var flora_log := PackedInt32Array()
+var flora_log_end: int = 0
 
 
 func _init(w: int = 0, h: int = 0) -> void:
@@ -68,7 +81,12 @@ func resize(w: int, h: int) -> void:
 	zones_y = ceili(float(h) / ZONE_SIZE)
 	_dirty = PackedByteArray()
 	_dirty.resize(chunks_x * chunks_y)
+	_dirty_rect = PackedInt32Array()
+	_dirty_rect.resize(chunks_x * chunks_y * 4)
 	_dirty_count = 0
+	flora_log = PackedInt32Array()
+	flora_log.resize(FLORA_LOG_SIZE)
+	flora_log_end = 0
 	mark_all_dirty()
 
 
@@ -92,6 +110,15 @@ func pos_of(i: int) -> Vector2i:
 
 func get_height(x: int, y: int) -> int:
 	return heights[x + y * width]
+
+
+## Ставит растение на клетку по индексу и пишет её в журнал флоры.
+func set_flora(i: int, value: int) -> void:
+	if floras[i] == value:
+		return
+	floras[i] = value
+	flora_log[flora_log_end & (FLORA_LOG_SIZE - 1)] = i
+	flora_log_end += 1
 
 
 func get_biome(x: int, y: int) -> int:
@@ -122,6 +149,9 @@ func set_value(layer: String, x: int, y: int, value: int) -> void:
 		return
 	if layer == "height":
 		value = clampi(value, HEIGHT_MIN, HEIGHT_MAX)
+	if layer == "flora":
+		set_flora(index(x, y), value)
+		return
 	get_layer(layer)[index(x, y)] = value
 	mark_dirty(x, y)
 
@@ -234,14 +264,14 @@ func chunk_rect(chunk: int) -> Rect2i:
 	return Rect2i(cx, cy, mini(CHUNK_SIZE, width - cx), mini(CHUNK_SIZE, height - cy))
 
 
-## Помечает чанк клетки (x, y). Клетки на краю чанка меняют тень и кромку
-## у соседей, поэтому помечаются и соседние чанки.
+## Помечает клетку (x, y) и её соседей по сторонам: от высоты клетки
+## зависят тень и кромка соседей. Сосед за краем чанка помечает свой чанк.
 func mark_dirty(x: int, y: int) -> void:
-	for d in [Vector2i.ZERO, Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-		var nx: int = x + d.x
-		var ny: int = y + d.y
-		if in_bounds(nx, ny):
-			_mark_chunk(chunk_of(nx, ny))
+	_mark_cell(x, y)
+	if x > 0: _mark_cell(x - 1, y)
+	if x < width - 1: _mark_cell(x + 1, y)
+	if y > 0: _mark_cell(x, y - 1)
+	if y < height - 1: _mark_cell(x, y + 1)
 
 
 func mark_all_dirty() -> void:
@@ -257,11 +287,22 @@ func has_dirty_chunks() -> bool:
 ## с них пометку. Остальные остаются помеченными до следующего вызова.
 func take_dirty_chunks(limit: int = 0) -> PackedInt32Array:
 	var out := PackedInt32Array()
+	for r in take_dirty_rects(limit):
+		out.append(chunk_of(r.position.x, r.position.y))
+	return out
+
+
+## Как take_dirty_chunks, но отдаёт прямоугольники изменённых клеток
+## (каждый внутри своего чанка).
+func take_dirty_rects(limit: int = 0) -> Array[Rect2i]:
+	var out: Array[Rect2i] = []
 	if _dirty_count == 0:
 		return out
 	for c in _dirty.size():
 		if _dirty[c] != 0:
-			out.append(c)
+			var k := c * 4
+			out.append(Rect2i(_dirty_rect[k], _dirty_rect[k + 1],
+				_dirty_rect[k + 2] - _dirty_rect[k] + 1, _dirty_rect[k + 3] - _dirty_rect[k + 1] + 1))
 			_dirty[c] = 0
 			_dirty_count -= 1
 			if limit > 0 and out.size() >= limit:
@@ -270,9 +311,32 @@ func take_dirty_chunks(limit: int = 0) -> PackedInt32Array:
 
 
 func _mark_chunk(c: int) -> void:
+	var r := chunk_rect(c)
+	var k := c * 4
+	_dirty_rect[k] = r.position.x
+	_dirty_rect[k + 1] = r.position.y
+	_dirty_rect[k + 2] = r.end.x - 1
+	_dirty_rect[k + 3] = r.end.y - 1
 	if _dirty[c] == 0:
 		_dirty[c] = 1
 		_dirty_count += 1
+
+
+func _mark_cell(x: int, y: int) -> void:
+	var c := (x / CHUNK_SIZE) + (y / CHUNK_SIZE) * chunks_x
+	var k := c * 4
+	if _dirty[c] == 0:
+		_dirty[c] = 1
+		_dirty_count += 1
+		_dirty_rect[k] = x
+		_dirty_rect[k + 1] = y
+		_dirty_rect[k + 2] = x
+		_dirty_rect[k + 3] = y
+		return
+	if x < _dirty_rect[k]: _dirty_rect[k] = x
+	if y < _dirty_rect[k + 1]: _dirty_rect[k + 1] = y
+	if x > _dirty_rect[k + 2]: _dirty_rect[k + 2] = x
+	if y > _dirty_rect[k + 3]: _dirty_rect[k + 3] = y
 
 
 # --- Сравнение и сохранение -----------------------------------------------

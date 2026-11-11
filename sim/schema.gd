@@ -2,12 +2,14 @@ extends RefCounted
 ## Проверка данных из JSON по простому описанию схемы.
 ##
 ## Описание поля — словарь:
-##   {"type": "string" | "id" | "int" | "number" | "bool" | "color" | "enum" | "array" | "object",
+##   {"type": "string" | "id" | "int" | "number" | "bool" | "color" | "enum" | "array" | "object" | "map",
 ##    "optional": true,             — поле можно не указывать
 ##    "min": 0, "max": 10,          — для int/number
 ##    "values": [...],              — для enum
 ##    "item": {...}, "min_items": 1 — для array
 ##    "fields": {...}}              — для object
+##    "value": {...}                — для map: объект, где ключи — любые id,
+##                                    а значения проверяются по value
 ##
 ## Ключи объекта, начинающиеся с "_" (например "_comment"), пропускаются —
 ## ими можно писать пояснения прямо в JSON. Любой другой лишний ключ — ошибка
@@ -82,6 +84,19 @@ static func check(value: Variant, spec: Dictionary, path: String, errors: Packed
 				if not fields.has(key):
 					errors.append("%s — неизвестное поле (опечатка?). Допустимые поля: %s"
 						% [join_path(path, str(key)), ", ".join(PackedStringArray(fields.keys()))])
+		"map":
+			if not value is Dictionary:
+				_err(errors, path, "ожидается объект {\"id\": значение, ...}", value)
+				return
+			var m: Dictionary = value
+			var vspec: Dictionary = spec.get("value", {})
+			for key in m:
+				if str(key).begins_with("_"):
+					continue
+				if not is_valid_id(str(key)):
+					errors.append("%s — ключ должен быть %s" % [join_path(path, str(key)), ID_HINT])
+					continue
+				check(m[key], vspec, join_path(path, str(key)), errors)
 		_:
 			errors.append("%s — внутренняя ошибка схемы: неизвестный тип \"%s\"" % [path, t])
 
@@ -98,6 +113,13 @@ static func normalize(value: Variant, spec: Dictionary) -> Variant:
 			for v in value:
 				out.append(normalize(v, item_spec))
 			return out
+		"map":
+			var vspec: Dictionary = spec.get("value", {})
+			var m := {}
+			for key in value:
+				if not str(key).begins_with("_"):
+					m[key] = normalize(value[key], vspec)
+			return m
 		"object":
 			var fields: Dictionary = spec.get("fields", {})
 			var obj := {}

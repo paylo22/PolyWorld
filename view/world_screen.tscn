@@ -70,32 +70,30 @@ layout_mode = 2
 focus_mode = 0
 text = "Меню"
 
-[node name="BottomBar" type="PanelContainer" parent="Hud"]
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
+[node name="InfoBar" type="PanelContainer" parent="Hud"]
 offset_left = 10.0
-offset_top = -84.0
-offset_right = 900.0
-offset_bottom = -10.0
-grow_vertical = 0
+offset_top = 10.0
+offset_right = 560.0
+offset_bottom = 86.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_bar")
 
-[node name="VBox" type="VBoxContainer" parent="Hud/BottomBar"]
+[node name="VBox" type="VBoxContainer" parent="Hud/InfoBar"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 0
 
-[node name="InfoLabel" type="Label" parent="Hud/BottomBar/VBox"]
+[node name="InfoLabel" type="Label" parent="Hud/InfoBar/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Тап по карте — сведения о клетке"
+theme_override_font_sizes/font_size = 18
+text = ""
+autowrap_mode = 3
 
-[node name="StatusLabel" type="Label" parent="Hud/BottomBar/VBox"]
+[node name="StatusLabel" type="Label" parent="Hud/InfoBar/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.75, 0.75, 0.7, 1)
 theme_override_font_sizes/font_size = 16
 text = ""
+autowrap_mode = 3

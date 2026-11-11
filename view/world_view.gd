@@ -2,9 +2,10 @@ extends Node2D
 ## Рисует землю: 1 клетка мира = 1 пиксель (docs/RESEARCH.md, «Визуал и камера»).
 ##
 ## Мир разбит на чанки 64×64, у каждого своя Image + ImageTexture + Sprite2D
-## (фильтр Nearest). Когда WorldData помечает чанк изменённым, перерисовывается
-## и заново загружается в видеопамять только он, и не больше
-## MAX_CHUNKS_PER_FRAME за кадр (правило 4 CLAUDE.md) — остальные в следующих кадрах.
+## (фильтр Nearest). Когда WorldData помечает чанк изменённым, в нём
+## пересчитывается только прямоугольник изменённых клеток, картинка чанка
+## заново загружается в видеопамять, и так не больше MAX_CHUNKS_PER_FRAME
+## чанков за кадр (правило 4 CLAUDE.md) — остальные в следующих кадрах.
 ##
 ## Цвет клетки:
 ##   вода — от светлой отмели к тёмной глубине, у берега светлая кромка (пена);
@@ -35,6 +36,7 @@ var world: WorldData
 
 var _sprites: Array[Sprite2D] = []
 var _textures: Array[ImageTexture] = []
+var _images: Array[Image] = []
 var _biome_rgb := PackedFloat32Array()
 var _deposit_rgb := PackedFloat32Array()  # r,g,b,есть ли цвет — на каждый ресурс
 
@@ -50,11 +52,13 @@ func setup(p_world: WorldData, defs) -> void:
 		s.queue_free()
 	_sprites.clear()
 	_textures.clear()
+	_images.clear()
 	var full := Rect2i(0, 0, world.width, world.height)
 	var img := Image.create_from_data(world.width, world.height, false, Image.FORMAT_RGB8, paint_rect(full))
 	for c in world.chunk_count():
 		var r := world.chunk_rect(c)
-		var tex := ImageTexture.create_from_image(img.get_region(r))
+		var chunk_img := img.get_region(r)
+		var tex := ImageTexture.create_from_image(chunk_img)
 		var s := Sprite2D.new()
 		s.texture = tex
 		s.centered = false
@@ -62,15 +66,18 @@ func setup(p_world: WorldData, defs) -> void:
 		add_child(s)
 		_sprites.append(s)
 		_textures.append(tex)
+		_images.append(chunk_img)
 	world.take_dirty_chunks()
 	last_build_ms = (Time.get_ticks_usec() - t0) / 1000.0
 
 
 func _process(_delta: float) -> void:
 	if world and world.has_dirty_chunks():
-		for c in world.take_dirty_chunks(MAX_CHUNKS_PER_FRAME):
-			var r := world.chunk_rect(c)
-			_textures[c].update(Image.create_from_data(r.size.x, r.size.y, false, Image.FORMAT_RGB8, paint_rect(r)))
+		for r in world.take_dirty_rects(MAX_CHUNKS_PER_FRAME):
+			var c := world.chunk_of(r.position.x, r.position.y)
+			var part := Image.create_from_data(r.size.x, r.size.y, false, Image.FORMAT_RGB8, paint_rect(r))
+			_images[c].blit_rect(part, Rect2i(Vector2i.ZERO, r.size), r.position - world.chunk_rect(c).position)
+			_textures[c].update(_images[c])
 
 
 func _build_palette(defs) -> void:
