@@ -11,6 +11,8 @@ extends Node
 ##
 ## Версия 1 (этап 0) была одним JSON без мира; такие файлы не читаются.
 
+const WorldState = preload("res://sim/world.gd")
+
 const SAVE_VERSION := 2
 const EXT := ".save"
 
@@ -40,13 +42,13 @@ func list_saves() -> Array[Dictionary]:
 	return out
 
 
-## Сохраняет текущий мир и часы в слот. Возвращает текст ошибки или "".
-## clock, world, defs — для тестов; по умолчанию автозагрузки.
-func save_game(slot: String, clock: Node = null, world: Node = null, defs: Node = null) -> String:
+## Сохраняет мир и часы в слот. Возвращает текст ошибки или "".
+## clock, world, defs — для тестов; по умолчанию GameClock, WorldState.current, Defs.
+func save_game(slot: String, clock: Node = null, world = null, defs: Node = null) -> String:
 	clock = clock if clock else GameClock
-	world = world if world else World
+	world = world if world else WorldState.current
 	defs = defs if defs else Defs
-	if not world.has_world():
+	if world == null or not world.has_world():
 		return "Нет мира для сохранения"
 	DirAccess.make_dir_recursive_absolute(saves_dir)
 	var path := saves_dir.path_join(slot + EXT)
@@ -75,11 +77,14 @@ func save_game(slot: String, clock: Node = null, world: Node = null, defs: Node 
 	return ""
 
 
-## Загружает слот. Возвращает текст ошибки или "".
-func load_game(slot: String, clock: Node = null, world: Node = null, defs: Node = null) -> String:
+## Загружает слот и делает его текущим миром (WorldState.current).
+## Возвращает текст ошибки или "" — при ошибке текущий мир не меняется.
+## clock, defs — для тестов; если передан world, загрузка идёт в него.
+func load_game(slot: String, clock: Node = null, world = null, defs: Node = null) -> String:
 	clock = clock if clock else GameClock
-	world = world if world else World
 	defs = defs if defs else Defs
+	var make_current: bool = world == null
+	world = world if world else WorldState.new()
 	var path := saves_dir.path_join(slot + EXT)
 	if not FileAccess.file_exists(path):
 		return "Сохранение не найдено: %s" % path
@@ -100,7 +105,12 @@ func load_game(slot: String, clock: Node = null, world: Node = null, defs: Node 
 	err = world.from_dict(body["world"], defs)
 	if err != "":
 		return err
-	return clock.from_dict(body["clock"])
+	err = clock.from_dict(body["clock"])
+	if err != "":
+		return err
+	if make_current:
+		WorldState.current = world
+	return ""
 
 
 func delete_save(slot: String) -> String:

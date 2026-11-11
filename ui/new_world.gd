@@ -5,6 +5,7 @@ extends Control
 ## Пределы и значения по умолчанию — из data/worldgen.json.
 
 const WorldGen = preload("res://sim/world_gen.gd")
+const WorldState = preload("res://sim/world.gd")
 const WORLD_SCENE := "res://view/world_screen.tscn"
 const MENU_SCENE := "res://ui/main_menu.tscn"
 
@@ -146,7 +147,7 @@ func _on_create() -> void:
 	_progress.value = WorldGen.STAGES.size()
 	_status.text = "Рисуем карту…"
 	await get_tree().process_frame
-	World.set_world(gen.world, gen.params, world_name, gen.total_ms())
+	WorldState.current = WorldState.new(gen.world, gen.params, world_name, gen.total_ms())
 	print("Мир %d×%d создан за %d мс: %s" % [gen.world.width, gen.world.height, gen.total_ms(), gen.stage_ms])
 	GameClock.reset()
 	GameClock.set_paused(false)

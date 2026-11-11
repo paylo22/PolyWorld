@@ -29,16 +29,15 @@ func _saveload() -> Node:
 	return sl
 
 
-func _world(seed_value: int) -> Node:
-	var w := _new(WorldScript)
+func _world(seed_value: int) -> RefCounted:
 	var gen = WorldGen.new(_defs, {"seed": seed_value, "size": 128})
-	w.set_world(gen.generate(), gen.params, "Тестовый мир %d" % seed_value)
-	return w
+	return WorldScript.new(gen.generate(), gen.params, "Тестовый мир %d" % seed_value)
 
 
 func cleanup() -> void:
 	for n in _made:
-		n.free()
+		if n is Node:
+			n.free()
 	_made.clear()
 	if DirAccess.dir_exists_absolute(DIR):
 		for f in DirAccess.get_files_at(DIR):
@@ -48,14 +47,14 @@ func cleanup() -> void:
 
 func test_world_roundtrip(t) -> void:
 	var sl := _saveload()
-	var a := _world(31)
+	var a = _world(31)
 	var ca := _new(Clock)
 	ca.set_paused(false)
 	ca.set_speed(5)
 	for i in 100:
 		ca.advance(1.0)
 	t.eq(sl.save_game("roundtrip", ca, a, _defs), "", "сохранение без ошибки")
-	var b := _new(WorldScript)
+	var b = WorldScript.new()
 	var cb := _new(Clock)
 	t.eq(sl.load_game("roundtrip", cb, b, _defs), "", "загрузка без ошибки")
 	t.ok(a.data.equals(b.data), "все слои мира совпали")
@@ -84,15 +83,15 @@ func test_overwrite_same_slot(t) -> void:
 	var sl := _saveload()
 	var c := _new(Clock)
 	sl.save_game("same", c, _world(1), _defs)
-	var w2 := _world(2)
+	var w2 = _world(2)
 	t.eq(sl.save_game("same", c, w2, _defs), "", "перезапись")
-	var back := _new(WorldScript)
+	var back = WorldScript.new()
 	sl.load_game("same", c, back, _defs)
 	t.ok(back.data.equals(w2.data), "в файле новый мир")
 
 
 func test_remap_when_biome_order_changes(t) -> void:
-	var a := _world(4)
+	var a = _world(4)
 	var d: Dictionary = a.to_dict(_defs)
 	# Как будто в старой версии биомы шли в обратном порядке.
 	var ids: Array = d["biome_ids"].duplicate()
@@ -105,7 +104,7 @@ func test_remap_when_biome_order_changes(t) -> void:
 			layer[i] = n - 1 - layer[i]
 	cells["layers"]["biome"] = layer
 	d["biome_ids"] = ids
-	var b := _new(WorldScript)
+	var b = WorldScript.new()
 	t.eq(b.from_dict(d, _defs), "", "загрузка")
 	t.eq(b.data.biomes, a.data.biomes, "номера биомов переведены")
 
@@ -121,9 +120,21 @@ func test_bad_versions(t) -> void:
 func test_missing_slot(t) -> void:
 	var sl := _saveload()
 	var c := _new(Clock)
-	t.has_text(sl.load_game("nope", c, _new(WorldScript), _defs), "не найдено", "нет файла")
+	t.has_text(sl.load_game("nope", c, WorldScript.new(), _defs), "не найдено", "нет файла")
 
 
 func test_no_world_to_save(t) -> void:
 	var sl := _saveload()
-	t.has_text(sl.save_game("x", _new(Clock), _new(WorldScript), _defs), "Нет мира", "пустой мир")
+	t.has_text(sl.save_game("x", _new(Clock), WorldScript.new(), _defs), "Нет мира", "пустой мир")
+
+
+func test_load_sets_current_world(t) -> void:
+	var sl := _saveload()
+	var c := _new(Clock)
+	sl.save_game("cur", c, _world(8), _defs)
+	var before = WorldScript.current
+	t.eq(sl.load_game("cur", c, null, _defs), "", "загрузка в текущий мир")
+	t.ok(WorldScript.current != null and WorldScript.current.world_name == "Тестовый мир 8", "текущий мир — загруженный")
+	t.has_text(sl.load_game("nope", c, null, _defs), "не найдено", "ошибка")
+	t.eq(WorldScript.current.world_name, "Тестовый мир 8", "при ошибке текущий мир не тронут")
+	WorldScript.current = before

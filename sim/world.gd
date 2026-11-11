@@ -1,10 +1,16 @@
-extends Node
-## Текущий мир (автозагрузка World): данные клеток, настройки генерации, имя.
-## Экран мира рисует World.data, SaveLoad сохраняет и загружает World.
+extends RefCounted
+## Состояние мира: данные клеток (WorldData), настройки генерации, название.
+##
+## Текущий мир лежит в статической переменной WorldState.current — так он
+## переживает смену сцен без отдельного узла-автозагрузки (правило 1 CLAUDE.md:
+## в sim/ только RefCounted). Использование:
+##   const WorldState = preload("res://sim/world.gd")
+##   WorldState.current = WorldState.new(data, params, "Мир 1")
 
 const WorldData = preload("res://sim/world_data.gd")
 
-signal world_changed
+## Мир, который сейчас открыт, или null.
+static var current = null
 
 var data: WorldData = null
 ## Настройки, с которыми мир был создан (seed, size, water, mountains, islands).
@@ -14,23 +20,15 @@ var world_name: String = ""
 var gen_ms: float = 0.0
 
 
-func has_world() -> bool:
-	return data != null
-
-
-func set_world(p_data: WorldData, p_params: Dictionary, p_name: String, p_gen_ms: float = 0.0) -> void:
+func _init(p_data: WorldData = null, p_params: Dictionary = {}, p_name: String = "", p_gen_ms: float = 0.0) -> void:
 	data = p_data
 	params = p_params.duplicate()
 	world_name = p_name
 	gen_ms = p_gen_ms
-	world_changed.emit()
 
 
-func clear() -> void:
-	data = null
-	params = {}
-	world_name = ""
-	world_changed.emit()
+func has_world() -> bool:
+	return data != null
 
 
 ## Имя файла сохранения для этого мира.
@@ -55,7 +53,8 @@ func to_dict(defs) -> Dictionary:
 	}
 
 
-## Возвращает текст ошибки или "".
+## Заполняет состояние из словаря. Возвращает текст ошибки или "".
+## Отсутствующие поля получают значения по умолчанию (правило 12).
 func from_dict(d: Dictionary, defs) -> String:
 	if not d.get("cells") is Dictionary:
 		return "world: нет раздела cells"
@@ -63,18 +62,21 @@ func from_dict(d: Dictionary, defs) -> String:
 	var err := wd.from_dict(d["cells"])
 	if err != "":
 		return err
-	err = _remap(wd.biomes, d.get("biome_ids", []), defs.biome_ids, "биом")
+	err = _remap(wd.biomes, d.get("biome_ids", defs.biome_ids), defs.biome_ids, "биом")
 	if err != "":
 		return err
-	err = _remap(wd.deposits, d.get("resource_ids", []), defs.resource_ids, "ресурс")
+	err = _remap(wd.resources, d.get("resource_ids", defs.resource_ids), defs.resource_ids, "ресурс")
 	if err != "":
 		return err
+	data = wd
 	var p = d.get("params", {})
-	set_world(wd, p if p is Dictionary else {}, str(d.get("name", "Мир")))
+	params = p if p is Dictionary else {}
+	world_name = str(d.get("name", "Мир"))
+	gen_ms = 0.0
 	return ""
 
 
-## Переводит номера из старого списка id в номера текущего.
+## Переводит номера из сохранённого списка id в номера текущего.
 static func _remap(layer: PackedInt32Array, saved_ids, current_ids: PackedStringArray, what: String) -> String:
 	var saved := PackedStringArray(saved_ids)
 	if saved == current_ids:

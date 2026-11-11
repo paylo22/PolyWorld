@@ -157,8 +157,9 @@ func to_dict() -> Dictionary:
 
 
 ## Восстанавливает состояние. Возвращает текст ошибки или "" если всё хорошо.
+## Отсутствующие поля получают значения по умолчанию (правило 12).
 func from_dict(data: Dictionary) -> String:
-	var steps = data.get("total_steps")
+	var steps = data.get("total_steps", 0)
 	if not (steps is int or steps is float) or steps < 0 or floor(steps) != steps:
 		return "clock.total_steps: ожидается целое число ≥ 0, получено %s" % [str(steps)]
 	var spd = data.get("speed", 1)
