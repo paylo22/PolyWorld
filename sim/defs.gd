@@ -78,7 +78,33 @@ const SCHEMAS := {
 					"features": {"type": "array", "item": {"type": "id"}},
 					"materials": {"type": "array", "min_items": 1, "item": {"type": "id"}},
 					"note": {"type": "string", "optional": true},
+					# шанс за одну проверку, что лес вида <id флоры> перейдёт на клетку этого биома
+					"forest_spread": {"type": "map", "optional": true, "value": {"type": "number", "min": 0, "max": 1}},
 				},
+			}},
+			"flora": {"type": "array", "min_items": 1, "item": {
+				"type": "object",
+				"fields": {
+					"id": {"type": "id"},
+					"name": {"type": "string"},
+					"sprite": {"type": "string"},
+					"map_color": {"type": "color"},
+					"forest": {"type": "bool", "optional": true},
+					"on_river": {"type": "bool", "optional": true},
+				},
+			}},
+			"flora_growth": {"type": "object", "fields": {
+				"checks_per_cell_per_year": {"type": "number", "min": 0, "max": 1000},
+			}},
+			"palette": {"type": "object", "fields": {
+				"brush_sizes": {"type": "array", "min_items": 1, "item": {"type": "int", "min": 1, "max": 31}},
+				"undo_strokes": {"type": "int", "min": 1, "max": 100},
+				"raise_step": {"type": "int", "min": 1, "max": 2000},
+				"lower_step": {"type": "int", "min": 1, "max": 2000},
+				"water_depth": {"type": "int", "min": 1, "max": 1000},
+				"river_cut": {"type": "int", "min": 0, "max": 1000},
+				"new_land_biome": {"type": "id"},
+				"veins": {"type": "array", "min_items": 1, "item": {"type": "id"}},
 			}},
 		},
 	},
@@ -154,6 +180,12 @@ var materials: Dictionary = {}
 var features: Dictionary = {}
 var biomes: Dictionary = {}
 var biome_ids: PackedStringArray = []
+## Флора (data/biomes.json, раздел flora): id → запись; flora_ids — порядок как в файле.
+var flora: Dictionary = {}
+var flora_ids: PackedStringArray = []
+## Рост леса (biomes.json, flora_growth) и числа палитры бога (biomes.json, palette).
+var flora_growth: Dictionary = {}
+var palette: Dictionary = {}
 ## Настройки генерации мира (data/worldgen.json) как есть.
 var worldgen: Dictionary = {}
 
@@ -256,6 +288,10 @@ func _clear() -> void:
 	features = {}
 	biomes = {}
 	biome_ids = []
+	flora = {}
+	flora_ids = []
+	flora_growth = {}
+	palette = {}
 	worldgen = {}
 
 
@@ -282,6 +318,26 @@ func _cross_check_biomes(data: Dictionary, label: String, res_ids: Array, check_
 			_check_refs(b["resources"], res_ids, label, p + ".resources", "ресурса", "data/resources.json")
 		_check_refs(b["features"], feat_ids, label, p + ".features", "особенности", "features")
 		_check_refs(b["materials"], mat_ids, label, p + ".materials", "материала", "materials")
+	var flora_ids_list := _unique_ids(data["flora"], "flora", label)
+	for i in list.size():
+		var b: Dictionary = list[i]
+		if b.has("forest_spread"):
+			_check_refs(b["forest_spread"].keys(), flora_ids_list, label,
+				Schema.item_path("biomes", i, b) + ".forest_spread", "флоры", "flora")
+	var pal: Dictionary = data["palette"]
+	var bids := []
+	for b in list:
+		bids.append(b["id"])
+	if not bids.has(pal["new_land_biome"]):
+		errors.append("%s: palette.new_land_biome — нет биома \"%s\" (есть: %s)"
+			% [label, pal["new_land_biome"], ", ".join(PackedStringArray(bids))])
+	if check_res:
+		_check_refs(pal["veins"], res_ids, label, "palette.veins", "ресурса", "data/resources.json")
+	var fl: Array = data["flora"]
+	for i in fl.size():
+		var sp := "res://assets/sprites/flora".path_join(fl[i]["sprite"])
+		if not ResourceLoader.exists(sp):
+			errors.append("%s: %s.sprite — нет картинки %s" % [label, Schema.item_path("flora", i, fl[i]), sp])
 
 
 func _cross_check_worldgen(data: Dictionary, label: String, bids: Array, rids: Array) -> void:
@@ -338,8 +394,18 @@ func _fill(parsed: Dictionary) -> void:
 		features[f["id"]] = f
 	for b in bdata["biomes"]:
 		b["color"] = Color.html(b["color"])
+		if not b.has("forest_spread"):
+			b["forest_spread"] = {}
 		biomes[b["id"]] = b
 		biome_ids.append(b["id"])
+	for f in bdata["flora"]:
+		f["map_color"] = Color.html(f["map_color"])
+		f["forest"] = f.get("forest", false)
+		f["on_river"] = f.get("on_river", false)
+		flora[f["id"]] = f
+		flora_ids.append(f["id"])
+	flora_growth = bdata["flora_growth"]
+	palette = bdata["palette"]
 	for r in resources.values():
 		if r.has("map_color"):
 			r["map_color"] = Color.html(r["map_color"])
@@ -349,6 +415,11 @@ func _fill(parsed: Dictionary) -> void:
 ## Номер биома в biome_ids (так биом хранится в слое мира) или -1.
 func biome_index(id: String) -> int:
 	return biome_ids.find(id)
+
+
+## Номер флоры в flora_ids (так растение хранится в слое мира) или -1.
+func flora_index(id: String) -> int:
+	return flora_ids.find(id)
 
 
 ## Номер ресурса в resource_ids (так жила хранится в слое мира) или -1.

@@ -1,45 +1,293 @@
 {
-  "_comment": "Биомы. Источник: docs/RESEARCH.md, раздел «Мир и палитра бога». resources — id из resources.json; features — природные особенности, которых пока нет в списке ресурсов; materials — лучший материал строительства. Цвет — цвет пикселя карты (черновой). Вода задаётся высотой < 0, а не биомом.",
+  "_comment": "Биомы. Источник: docs/RESEARCH.md, раздел «Мир и палитра бога». resources — id из resources.json; features — природные особенности, которых пока нет в списке ресурсов; materials — лучший материал строительства. Цвет — цвет пикселя карты (черновой). Вода задаётся высотой < 0, а не биомом. forest_spread — шанс, что лес данного вида (id из flora) перейдёт с соседней клетки на клетку этого биома за одну проверку.",
   "materials": [
-    { "id": "wood", "name": "Дерево" },
-    { "id": "wood_stilts", "name": "Дерево на сваях" },
-    { "id": "stone", "name": "Камень" },
-    { "id": "brick", "name": "Кирпич" },
-    { "id": "adobe", "name": "Сырцовый кирпич" }
+    {
+      "id": "wood",
+      "name": "Дерево"
+    },
+    {
+      "id": "wood_stilts",
+      "name": "Дерево на сваях"
+    },
+    {
+      "id": "stone",
+      "name": "Камень"
+    },
+    {
+      "id": "brick",
+      "name": "Кирпич"
+    },
+    {
+      "id": "adobe",
+      "name": "Сырцовый кирпич"
+    }
   ],
   "features": [
-    { "id": "game", "name": "Дичь" },
-    { "id": "berries", "name": "Ягоды" },
-    { "id": "farmland", "name": "Пашня" },
-    { "id": "pasture", "name": "Пастбища" },
-    { "id": "vineyard", "name": "Виноград" },
-    { "id": "peat", "name": "Торф" },
-    { "id": "reed", "name": "Камыш" },
-    { "id": "sand", "name": "Песок" },
-    { "id": "furs", "name": "Меха" },
-    { "id": "pearls", "name": "Жемчуг" }
+    {
+      "id": "game",
+      "name": "Дичь"
+    },
+    {
+      "id": "berries",
+      "name": "Ягоды"
+    },
+    {
+      "id": "farmland",
+      "name": "Пашня"
+    },
+    {
+      "id": "pasture",
+      "name": "Пастбища"
+    },
+    {
+      "id": "vineyard",
+      "name": "Виноград"
+    },
+    {
+      "id": "peat",
+      "name": "Торф"
+    },
+    {
+      "id": "reed",
+      "name": "Камыш"
+    },
+    {
+      "id": "sand",
+      "name": "Песок"
+    },
+    {
+      "id": "furs",
+      "name": "Меха"
+    },
+    {
+      "id": "pearls",
+      "name": "Жемчуг"
+    }
   ],
   "biomes": [
-    { "id": "forest", "name": "Лес", "color": "#3f7a32",
-      "resources": ["wood"], "features": ["game", "berries"], "materials": ["wood"] },
-    { "id": "meadow", "name": "Луг / равнина", "color": "#7fb04a",
-      "resources": ["clay"], "features": ["farmland", "pasture"], "materials": ["wood", "brick"],
-      "note": "глина — у рек" },
-    { "id": "hills", "name": "Холмы", "color": "#9a9a5c",
-      "resources": ["stone"], "features": ["pasture", "vineyard"], "materials": ["stone"] },
-    { "id": "mountains", "name": "Горы", "color": "#8a837a",
-      "resources": ["stone", "iron_ore", "coal", "sulfur", "gold"], "features": [], "materials": ["stone"] },
-    { "id": "swamp", "name": "Болото", "color": "#55704c",
-      "resources": ["saltpeter"], "features": ["peat", "reed"], "materials": ["wood_stilts"],
-      "note": "камень и кирпич проседают (×0,5 HP)" },
-    { "id": "steppe", "name": "Пустыня / степь", "color": "#d6c27e",
-      "resources": ["saltpeter", "horses"], "features": ["sand"], "materials": ["adobe", "stone"],
-      "note": "деревянный город горит цепной реакцией" },
-    { "id": "taiga", "name": "Тайга / снег", "color": "#c9d6d2",
-      "resources": ["wood"], "features": ["furs"], "materials": ["wood"],
-      "note": "дерево — бревно" },
-    { "id": "coast", "name": "Побережье", "color": "#d9cf9a",
-      "resources": ["fish", "salt"], "features": ["pearls"], "materials": ["stone"],
-      "note": "сырость губит дерево: гниёт вдвое быстрее" }
-  ]
+    {
+      "id": "forest",
+      "name": "Лес",
+      "color": "#3f7a32",
+      "resources": [
+        "wood"
+      ],
+      "features": [
+        "game",
+        "berries"
+      ],
+      "materials": [
+        "wood"
+      ],
+      "forest_spread": {
+        "broadleaf": 0.6,
+        "conifer": 0.35
+      }
+    },
+    {
+      "id": "meadow",
+      "name": "Луг / равнина",
+      "color": "#7fb04a",
+      "resources": [
+        "clay"
+      ],
+      "features": [
+        "farmland",
+        "pasture"
+      ],
+      "materials": [
+        "wood",
+        "brick"
+      ],
+      "note": "глина — у рек",
+      "forest_spread": {
+        "broadleaf": 0.5,
+        "conifer": 0.15
+      }
+    },
+    {
+      "id": "hills",
+      "name": "Холмы",
+      "color": "#9a9a5c",
+      "resources": [
+        "stone"
+      ],
+      "features": [
+        "pasture",
+        "vineyard"
+      ],
+      "materials": [
+        "stone"
+      ],
+      "forest_spread": {
+        "broadleaf": 0.25,
+        "conifer": 0.35
+      }
+    },
+    {
+      "id": "mountains",
+      "name": "Горы",
+      "color": "#8a837a",
+      "resources": [
+        "stone",
+        "iron_ore",
+        "coal",
+        "sulfur",
+        "gold"
+      ],
+      "features": [],
+      "materials": [
+        "stone"
+      ],
+      "forest_spread": {
+        "conifer": 0.08
+      }
+    },
+    {
+      "id": "swamp",
+      "name": "Болото",
+      "color": "#55704c",
+      "resources": [
+        "saltpeter"
+      ],
+      "features": [
+        "peat",
+        "reed"
+      ],
+      "materials": [
+        "wood_stilts"
+      ],
+      "note": "камень и кирпич проседают (×0,5 HP)",
+      "forest_spread": {
+        "broadleaf": 0.2,
+        "conifer": 0.05
+      }
+    },
+    {
+      "id": "steppe",
+      "name": "Пустыня / степь",
+      "color": "#d6c27e",
+      "resources": [
+        "saltpeter",
+        "horses"
+      ],
+      "features": [
+        "sand"
+      ],
+      "materials": [
+        "adobe",
+        "stone"
+      ],
+      "note": "деревянный город горит цепной реакцией",
+      "forest_spread": {
+        "broadleaf": 0.03
+      }
+    },
+    {
+      "id": "taiga",
+      "name": "Тайга / снег",
+      "color": "#c9d6d2",
+      "resources": [
+        "wood"
+      ],
+      "features": [
+        "furs"
+      ],
+      "materials": [
+        "wood"
+      ],
+      "note": "дерево — бревно",
+      "forest_spread": {
+        "broadleaf": 0.05,
+        "conifer": 0.55
+      }
+    },
+    {
+      "id": "coast",
+      "name": "Побережье",
+      "color": "#d9cf9a",
+      "resources": [
+        "fish",
+        "salt"
+      ],
+      "features": [
+        "pearls"
+      ],
+      "materials": [
+        "stone"
+      ],
+      "note": "сырость губит дерево: гниёт вдвое быстрее",
+      "forest_spread": {
+        "broadleaf": 0.08,
+        "conifer": 0.08
+      }
+    }
+  ],
+  "_comment_flora": "Флора: растения на клетках суши. forest — лес, расползается сам (скорость — forest_spread у биомов). on_river — можно сажать на русло реки. sprite — картинка в assets/sprites/flora (16×16, низ картинки — земля). map_color — цвет на карте при мелком масштабе.",
+  "flora": [
+    {
+      "id": "broadleaf",
+      "name": "Лиственный лес",
+      "sprite": "broadleaf.png",
+      "map_color": "#2f6a26",
+      "forest": true
+    },
+    {
+      "id": "conifer",
+      "name": "Хвойный лес",
+      "sprite": "conifer.png",
+      "map_color": "#1f4f33",
+      "forest": true
+    },
+    {
+      "id": "bush",
+      "name": "Кусты",
+      "sprite": "bush.png",
+      "map_color": "#4c7a2c"
+    },
+    {
+      "id": "berries",
+      "name": "Ягоды",
+      "sprite": "berries.png",
+      "map_color": "#6b3a4a"
+    },
+    {
+      "id": "reed",
+      "name": "Камыш",
+      "sprite": "reed.png",
+      "map_color": "#8f9a4a",
+      "on_river": true
+    },
+    {
+      "id": "wild_grain",
+      "name": "Дикие злаки",
+      "sprite": "wild_grain.png",
+      "map_color": "#c9b45a"
+    }
+  ],
+  "_comment_growth": "Рост леса: каждый тик проверяется случайная порция клеток. checks_per_cell_per_year — сколько раз в среднем за игровой год проверяется одна клетка (порция = клеток мира × это число / тиков в году).",
+  "flora_growth": {
+    "checks_per_cell_per_year": 12
+  },
+  "_comment_palette": "Палитра бога. Высоты в тех же единицах, что в worldgen.json (−1000…1000, вода < 0). Каждая клетка меняется не больше одного раза за мазок.",
+  "palette": {
+    "brush_sizes": [
+      1,
+      3,
+      5,
+      9
+    ],
+    "undo_strokes": 10,
+    "raise_step": 120,
+    "lower_step": 120,
+    "water_depth": 150,
+    "river_cut": 30,
+    "new_land_biome": "meadow",
+    "veins": [
+      "iron_ore",
+      "coal",
+      "sulfur",
+      "gold"
+    ]
+  }
 }

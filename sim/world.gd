@@ -8,6 +8,8 @@ extends RefCounted
 ##   WorldState.current = WorldState.new(data, params, "Мир 1")
 
 const WorldData = preload("res://sim/world_data.gd")
+const GodPalette = preload("res://sim/god_palette.gd")
+const FloraGrowth = preload("res://sim/flora_growth.gd")
 
 ## Мир, который сейчас открыт, или null.
 static var current = null
@@ -18,6 +20,12 @@ var params: Dictionary = {}
 var world_name: String = ""
 ## Сколько мс заняла генерация (0 для загруженного мира).
 var gen_ms: float = 0.0
+## Случайность живого мира (рост леса и всё, что будет дальше). Правило 8:
+## сид — от сида мира, состояние пишется в сохранение.
+var rng := RandomNumberGenerator.new()
+## Команды палитры бога и рост леса. Создаются в start_sim().
+var palette: GodPalette = null
+var growth: FloraGrowth = null
 
 
 func _init(p_data: WorldData = null, p_params: Dictionary = {}, p_name: String = "", p_gen_ms: float = 0.0) -> void:
@@ -25,6 +33,23 @@ func _init(p_data: WorldData = null, p_params: Dictionary = {}, p_name: String =
 	params = p_params.duplicate()
 	world_name = p_name
 	gen_ms = p_gen_ms
+	_seed_rng()
+
+
+## Готовит системы, которые меняют мир: палитру бога и рост леса.
+func start_sim(defs) -> void:
+	palette = GodPalette.new(data, defs)
+	growth = FloraGrowth.new(data, defs, rng)
+
+
+## Один шаг симуляции (подключается к GameClock.step).
+func step(step_index: int) -> void:
+	if growth:
+		growth.on_step(step_index)
+
+
+func _seed_rng() -> void:
+	rng.seed = hash("sim:%s" % str(params.get("seed", 0)))
 
 
 func has_world() -> bool:
@@ -49,6 +74,9 @@ func to_dict(defs) -> Dictionary:
 		"params": params,
 		"biome_ids": Array(defs.biome_ids),
 		"resource_ids": Array(defs.resource_ids),
+		"flora_ids": Array(defs.flora_ids),
+		"rng_seed": rng.seed,
+		"rng_state": rng.state,
 		"cells": data.to_dict(),
 	}
 
@@ -68,11 +96,21 @@ func from_dict(d: Dictionary, defs) -> String:
 	err = _remap(wd.resources, d.get("resource_ids", defs.resource_ids), defs.resource_ids, "ресурс")
 	if err != "":
 		return err
+	err = _remap(wd.floras, d.get("flora_ids", defs.flora_ids), defs.flora_ids, "растение")
+	if err != "":
+		return err
 	data = wd
 	var p = d.get("params", {})
 	params = p if p is Dictionary else {}
 	world_name = str(d.get("name", "Мир"))
 	gen_ms = 0.0
+	palette = null
+	growth = null
+	# Старое сохранение без состояния случайности: сид от сида мира (правило 12).
+	_seed_rng()
+	if d.get("rng_seed") is int and d.get("rng_state") is int:
+		rng.seed = d["rng_seed"]
+		rng.state = d["rng_state"]
 	return ""
 
 
