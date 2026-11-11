@@ -1,7 +1,7 @@
 extends Node
 ## Сохранение и загрузка (автозагрузка SaveLoad).
 ##
-## Один файл user://save.json. Внутри словарь:
+## Один файл user://saves/save.json (правило 12 CLAUDE.md). Внутри словарь:
 ##   {"version": 1, "game_version": "0.1.0", "saved_at": "...", "clock": {...}}
 ## Поле version — версия формата сохранения. Если формат меняется,
 ## увеличь SAVE_VERSION и допиши перенос старых данных в _migrate().
@@ -10,7 +10,7 @@ extends Node
 ## со словарём от system.to_dict(), в apply_save_dict() — вызов from_dict().
 
 const SAVE_VERSION := 1
-const DEFAULT_PATH := "user://save.json"
+const DEFAULT_PATH := "user://saves/save.json"
 
 
 func has_save(path: String = DEFAULT_PATH) -> bool:
@@ -20,6 +20,7 @@ func has_save(path: String = DEFAULT_PATH) -> bool:
 ## Сохраняет игру. Возвращает текст ошибки или "" если всё хорошо.
 func save_game(path: String = DEFAULT_PATH, clock: Node = null) -> String:
 	var data := build_save_dict(clock if clock else GameClock)
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	var tmp := path + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
@@ -28,6 +29,8 @@ func save_game(path: String = DEFAULT_PATH, clock: Node = null) -> String:
 	f.close()
 	# Сначала пишем во временный файл, потом подменяем: если игра упадёт
 	# посреди записи, старое сохранение останется целым.
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(path)
 	var err := DirAccess.rename_absolute(tmp, path)
 	if err != OK:
 		return "Не удалось записать %s: %s" % [path, error_string(err)]
