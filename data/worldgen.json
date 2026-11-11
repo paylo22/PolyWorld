@@ -1,0 +1,57 @@
+{
+  "_comment": "Настройки генерации мира. Высота клетки: от -1000 (глубоко) до 1000 (пик), 0 — уровень моря, вода < 0. Влажность: 0..1000. Источник: docs/RESEARCH.md, «Мир и палитра бога».",
+  "size_min": 128,
+  "size_max": 576,
+  "size_step": 64,
+  "size_default": 256,
+  "defaults": { "water": 45, "mountains": 40, "islands": 3 },
+  "limits": { "water_min": 10, "water_max": 80, "islands_min": 1, "islands_max": 10 },
+
+  "height_frequency": 0.012,
+  "height_octaves": 5,
+  "ridge_frequency": 0.018,
+  "ridge_strength": 0.6,
+  "moisture_frequency": 0.01,
+  "island_weight": 1.1,
+  "noise_weight": 0.55,
+
+  "_comment_heights": "Доля гор среди суши растёт с ползунком «Гористость» от mountain_share_min до mountain_share_max; холмов — в hills_ratio раз больше гор.",
+  "hills_height": 500,
+  "mountain_height": 700,
+  "mountain_share_min": 0.03,
+  "mountain_share_max": 0.2,
+  "hills_ratio": 1.4,
+
+  "land_cells_per_river": 2500,
+  "rivers_min": 2,
+  "rivers_max": 40,
+  "river_min_length": 6,
+  "river_moisture_radius": 6,
+  "river_moisture_bonus": 250,
+  "water_moisture_radius": 4,
+  "water_moisture_bonus": 120,
+
+  "clay_radius": 2,
+  "clay_chance": 0.3,
+  "veins_per_1000_mountain": 6,
+  "vein_size_min": 3,
+  "vein_size_max": 10,
+  "veins": [
+    { "resource": "iron_ore", "weight": 4 },
+    { "resource": "coal", "weight": 4 },
+    { "resource": "sulfur", "weight": 2 },
+    { "resource": "gold", "weight": 1 }
+  ],
+
+  "_comment_rules": "Биом клетки суши — первое подходящее правило сверху вниз. max_sea_distance — не дальше N клеток от моря.",
+  "biome_rules": [
+    { "biome": "coast", "height_max": 60, "max_sea_distance": 2 },
+    { "biome": "mountains", "height_min": 700 },
+    { "biome": "taiga", "height_min": 500, "moisture_min": 600 },
+    { "biome": "hills", "height_min": 500 },
+    { "biome": "swamp", "height_max": 220, "moisture_min": 800 },
+    { "biome": "forest", "moisture_min": 560 },
+    { "biome": "steppe", "moisture_max": 280 },
+    { "biome": "meadow" }
+  ]
+}
