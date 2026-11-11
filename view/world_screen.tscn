@@ -1,0 +1,101 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://view/world_screen.gd" id="1_screen"]
+[ext_resource type="Script" path="res://view/world_view.gd" id="2_view"]
+[ext_resource type="Script" path="res://view/world_camera.gd" id="3_cam"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar"]
+bg_color = Color(0.08, 0.09, 0.1, 0.72)
+content_margin_left = 12.0
+content_margin_top = 6.0
+content_margin_right = 12.0
+content_margin_bottom = 6.0
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="WorldScreen" type="Node2D"]
+script = ExtResource("1_screen")
+
+[node name="WorldView" type="Node2D" parent="."]
+script = ExtResource("2_view")
+
+[node name="Camera" type="Camera2D" parent="."]
+script = ExtResource("3_cam")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="TopBar" type="PanelContainer" parent="Hud"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -620.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 86.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_bar")
+
+[node name="HBox" type="HBoxContainer" parent="Hud/TopBar"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 2
+
+[node name="DateLabel" type="Label" parent="Hud/TopBar/HBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Год 1, Весна, день 1"
+vertical_alignment = 1
+
+[node name="HomeButton" type="Button" parent="Hud/TopBar/HBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 64)
+layout_mode = 2
+focus_mode = 0
+text = "Вся карта"
+
+[node name="SaveButton" type="Button" parent="Hud/TopBar/HBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 64)
+layout_mode = 2
+focus_mode = 0
+text = "Сохранить"
+
+[node name="MenuButton" type="Button" parent="Hud/TopBar/HBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 64)
+layout_mode = 2
+focus_mode = 0
+text = "Меню"
+
+[node name="BottomBar" type="PanelContainer" parent="Hud"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -84.0
+offset_right = 900.0
+offset_bottom = -10.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bar")
+
+[node name="VBox" type="VBoxContainer" parent="Hud/BottomBar"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="InfoLabel" type="Label" parent="Hud/BottomBar/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Тап по карте — сведения о клетке"
+
+[node name="StatusLabel" type="Label" parent="Hud/BottomBar/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.7, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
