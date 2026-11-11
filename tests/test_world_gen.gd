@@ -74,8 +74,8 @@ func test_all_biomes_rivers_and_deposits(t) -> void:
 			seen[w.biomes[i]] = true
 			if w.flags[i] & WorldData.FLAG_RIVER:
 				rivers += 1
-			if w.deposits[i] >= 0:
-				deps[_defs.resource_ids[w.deposits[i]]] = true
+			if w.resources[i] >= 0:
+				deps[_defs.resource_ids[w.resources[i]]] = true
 		for id in _defs.biome_ids:
 			t.ok(seen.has(_defs.biome_index(id)), "сид %d: есть биом %s" % [s, id])
 		t.ok(rivers > 50, "сид %d: есть реки (%d клеток)" % [s, rivers])
@@ -100,7 +100,7 @@ func test_deposits_in_right_places(t) -> void:
 	var mount_h: int = _defs.worldgen["hills_height"]
 	var wrong := 0
 	for i in w.cell_count():
-		var d := w.deposits[i]
+		var d := w.resources[i]
 		if d < 0:
 			continue
 		if d == clay:

@@ -7,9 +7,12 @@ extends RefCounted
 ##   height   — высота: -1000..-1 вода, 0 уровень моря, 1..1000 суша;
 ##   moisture — влажность 0..1000;
 ##   biome    — номер биома в Defs.biome_ids, -1 для воды;
-##   deposit  — номер ресурса жилы в Defs.resource_ids, -1 если жилы нет;
-##   flags    — битовые флаги (FLAG_RIVER — река);
-##   owner    — номер королевства-владельца, -1 если ничьё.
+##   flora    — растение на клетке, -1 если пусто (заполняется с этапа 2);
+##   resource — номер ресурса жилы в Defs.resource_ids, -1 если жилы нет;
+##   owner    — номер королевства-владельца, -1 если ничьё;
+##   building_id — номер здания на клетке, -1 если нет (с этапа 4);
+##   flags    — битовые флаги (FLAG_RIVER — река).
+## Слои по правилу 3 CLAUDE.md; flags — дополнительно, для рек.
 ##
 ## Любая правка через set_* помечает чанк «грязным», а WorldView
 ## перерисовывает только такие чанки.
@@ -17,7 +20,9 @@ extends RefCounted
 const CHUNK_SIZE := 64
 const ZONE_SIZE := 8
 
-const LAYERS: Array[String] = ["height", "moisture", "biome", "deposit", "flags", "owner"]
+const LAYERS: Array[String] = ["height", "moisture", "biome", "flora", "resource", "owner", "building_id", "flags"]
+## Чем заполняется слой в новом мире и в старом сохранении, где слоя ещё не было.
+const LAYER_DEFAULTS := {"height": 0, "moisture": 0, "biome": -1, "flora": -1, "resource": -1, "owner": -1, "building_id": -1, "flags": 0}
 const FLAG_RIVER := 1
 const NONE := -1
 
@@ -30,9 +35,11 @@ var height: int = 0
 var heights := PackedInt32Array()
 var moistures := PackedInt32Array()
 var biomes := PackedInt32Array()
-var deposits := PackedInt32Array()
-var flags := PackedInt32Array()
+var floras := PackedInt32Array()
+var resources := PackedInt32Array()
 var owners := PackedInt32Array()
+var building_ids := PackedInt32Array()
+var flags := PackedInt32Array()
 
 var chunks_x: int = 0
 var chunks_y: int = 0
@@ -48,20 +55,13 @@ func _init(w: int = 0, h: int = 0) -> void:
 		resize(w, h)
 
 
-## Создаёт пустой мир: всё вода глубиной 0, без биомов, жил и владельцев.
+## Создаёт пустой мир: все слои заполнены значениями из LAYER_DEFAULTS.
 func resize(w: int, h: int) -> void:
 	width = w
 	height = h
 	var n := w * h
-	heights = PackedInt32Array()
-	heights.resize(n)
-	moistures = PackedInt32Array()
-	moistures.resize(n)
-	biomes = _filled(n, NONE)
-	deposits = _filled(n, NONE)
-	flags = PackedInt32Array()
-	flags.resize(n)
-	owners = _filled(n, NONE)
+	for name in LAYERS:
+		_set_layer(name, _filled(n, LAYER_DEFAULTS[name]))
 	chunks_x = ceili(float(w) / CHUNK_SIZE)
 	chunks_y = ceili(float(h) / CHUNK_SIZE)
 	zones_x = ceili(float(w) / ZONE_SIZE)
@@ -109,40 +109,56 @@ func is_river(x: int, y: int) -> bool:
 ## Все слои клетки одним словарём (для лупы и отладки).
 func get_cell(x: int, y: int) -> Dictionary:
 	var i := index(x, y)
-	return {
-		"x": x, "y": y,
-		"height": heights[i], "moisture": moistures[i], "biome": biomes[i],
-		"deposit": deposits[i], "flags": flags[i], "owner": owners[i],
-	}
+	var out := {"x": x, "y": y}
+	for name in LAYERS:
+		out[name] = get_layer(name)[i]
+	return out
 
 
 ## Меняет один слой клетки по имени ("height", "biome", ...) и помечает чанк.
 func set_value(layer: String, x: int, y: int, value: int) -> void:
-	var i := index(x, y)
-	match layer:
-		"height": heights[i] = clampi(value, HEIGHT_MIN, HEIGHT_MAX)
-		"moisture": moistures[i] = value
-		"biome": biomes[i] = value
-		"deposit": deposits[i] = value
-		"flags": flags[i] = value
-		"owner": owners[i] = value
-		_:
-			push_error("WorldData.set_value: нет слоя \"%s\"" % layer)
-			return
+	if not LAYER_DEFAULTS.has(layer):
+		push_error("WorldData.set_value: нет слоя \"%s\"" % layer)
+		return
+	if layer == "height":
+		value = clampi(value, HEIGHT_MIN, HEIGHT_MAX)
+	get_layer(layer)[index(x, y)] = value
 	mark_dirty(x, y)
 
 
 func get_value(layer: String, x: int, y: int) -> int:
-	var i := index(x, y)
+	if not LAYER_DEFAULTS.has(layer):
+		push_error("WorldData.get_value: нет слоя \"%s\"" % layer)
+		return 0
+	return get_layer(layer)[index(x, y)]
+
+
+## Массив слоя по имени. Packed-массивы передаются по ссылке: запись в него
+## меняет мир (но не помечает чанки — для этого set_value или mark_dirty).
+func get_layer(layer: String) -> PackedInt32Array:
 	match layer:
-		"height": return heights[i]
-		"moisture": return moistures[i]
-		"biome": return biomes[i]
-		"deposit": return deposits[i]
-		"flags": return flags[i]
-		"owner": return owners[i]
-	push_error("WorldData.get_value: нет слоя \"%s\"" % layer)
-	return 0
+		"height": return heights
+		"moisture": return moistures
+		"biome": return biomes
+		"flora": return floras
+		"resource": return resources
+		"owner": return owners
+		"building_id": return building_ids
+		"flags": return flags
+	push_error("WorldData.get_layer: нет слоя \"%s\"" % layer)
+	return PackedInt32Array()
+
+
+func _set_layer(layer: String, arr: PackedInt32Array) -> void:
+	match layer:
+		"height": heights = arr
+		"moisture": moistures = arr
+		"biome": biomes = arr
+		"flora": floras = arr
+		"resource": resources = arr
+		"owner": owners = arr
+		"building_id": building_ids = arr
+		"flags": flags = arr
 
 
 # --- Соседи ---------------------------------------------------------------
@@ -237,8 +253,9 @@ func has_dirty_chunks() -> bool:
 	return _dirty_count > 0
 
 
-## Отдаёт список изменённых чанков и снимает пометки.
-func take_dirty_chunks() -> PackedInt32Array:
+## Отдаёт изменённые чанки (не больше limit, если limit > 0) и снимает
+## с них пометку. Остальные остаются помеченными до следующего вызова.
+func take_dirty_chunks(limit: int = 0) -> PackedInt32Array:
 	var out := PackedInt32Array()
 	if _dirty_count == 0:
 		return out
@@ -246,7 +263,9 @@ func take_dirty_chunks() -> PackedInt32Array:
 		if _dirty[c] != 0:
 			out.append(c)
 			_dirty[c] = 0
-	_dirty_count = 0
+			_dirty_count -= 1
+			if limit > 0 and out.size() >= limit:
+				break
 	return out
 
 
@@ -259,44 +278,44 @@ func _mark_chunk(c: int) -> void:
 # --- Сравнение и сохранение -----------------------------------------------
 
 func equals(other) -> bool:
-	return other != null and width == other.width and height == other.height \
-		and heights == other.heights and moistures == other.moistures \
-		and biomes == other.biomes and deposits == other.deposits \
-		and flags == other.flags and owners == other.owners
+	if other == null or width != other.width or height != other.height:
+		return false
+	for name in LAYERS:
+		if get_layer(name) != other.get_layer(name):
+			return false
+	return true
 
 
 func to_dict() -> Dictionary:
-	return {
-		"width": width, "height": height,
-		"layers": {
-			"height": heights, "moisture": moistures, "biome": biomes,
-			"deposit": deposits, "flags": flags, "owner": owners,
-		},
-	}
+	var layers := {}
+	for name in LAYERS:
+		layers[name] = get_layer(name)
+	return {"width": width, "height": height, "layers": layers}
 
 
 ## Заполняет мир из словаря. Возвращает текст ошибки или "".
+## Слой, которого нет в словаре (старое сохранение), заполняется значением
+## по умолчанию — так старые сохранения открываются (правило 12).
 func from_dict(data: Dictionary) -> String:
 	var w = data.get("width")
 	var h = data.get("height")
 	if not (w is int and h is int) or w <= 0 or h <= 0:
 		return "world: неверный размер мира %s × %s" % [str(w), str(h)]
-	var layers = data.get("layers")
+	var layers = data.get("layers", {})
 	if not layers is Dictionary:
-		return "world: нет раздела layers"
+		return "world: раздел layers не того типа"
 	for name in LAYERS:
-		var arr = layers.get(name)
+		if not layers.has(name):
+			continue
+		var arr = layers[name]
 		if not arr is PackedInt32Array:
-			return "world.layers.%s: слой отсутствует или не того типа" % name
+			return "world.layers.%s: слой не того типа" % name
 		if arr.size() != w * h:
 			return "world.layers.%s: размер %d, а должен быть %d" % [name, arr.size(), w * h]
 	resize(w, h)
-	heights = layers["height"]
-	moistures = layers["moisture"]
-	biomes = layers["biome"]
-	deposits = layers["deposit"]
-	flags = layers["flags"]
-	owners = layers["owner"]
+	for name in LAYERS:
+		if layers.has(name):
+			_set_layer(name, layers[name])
 	mark_all_dirty()
 	return ""
 

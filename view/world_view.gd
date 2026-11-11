@@ -1,9 +1,10 @@
 extends Node2D
 ## Рисует землю: 1 клетка мира = 1 пиксель (docs/RESEARCH.md, «Визуал и камера»).
 ##
-## Мир разбит на чанки 64×64, у каждого своя текстура (Sprite2D с фильтром
-## Nearest). Когда WorldData помечает чанк изменённым, перерисовывается
-## и заново загружается в видеопамять только он.
+## Мир разбит на чанки 64×64, у каждого своя Image + ImageTexture + Sprite2D
+## (фильтр Nearest). Когда WorldData помечает чанк изменённым, перерисовывается
+## и заново загружается в видеопамять только он, и не больше
+## MAX_CHUNKS_PER_FRAME за кадр (правило 4 CLAUDE.md) — остальные в следующих кадрах.
 ##
 ## Цвет клетки:
 ##   вода — от светлой отмели к тёмной глубине, у берега светлая кромка (пена);
@@ -23,6 +24,7 @@ const SNOW := Color("#efefe8")
 const SAND_RIM := Color("#efe3b8")
 const UNKNOWN := Color("#ff00ff")
 
+const MAX_CHUNKS_PER_FRAME := 4
 const SNOW_HEIGHT := 930
 const SHADOW_PER_UNIT := 0.012
 const SHADOW_MAX := 0.45
@@ -66,7 +68,7 @@ func setup(p_world: WorldData, defs) -> void:
 
 func _process(_delta: float) -> void:
 	if world and world.has_dirty_chunks():
-		for c in world.take_dirty_chunks():
+		for c in world.take_dirty_chunks(MAX_CHUNKS_PER_FRAME):
 			var r := world.chunk_rect(c)
 			_textures[c].update(Image.create_from_data(r.size.x, r.size.y, false, Image.FORMAT_RGB8, paint_rect(r)))
 
@@ -93,7 +95,7 @@ func paint_rect(rect: Rect2i) -> PackedByteArray:
 	var heights := world.heights
 	var biomes := world.biomes
 	var flags := world.flags
-	var deposits := world.deposits
+	var resources := world.resources
 	var out := PackedByteArray()
 	out.resize(rect.size.x * rect.size.y * 3)
 	var o := 0
@@ -151,7 +153,7 @@ func paint_rect(rect: Rect2i) -> PackedByteArray:
 				r *= k
 				g *= k
 				b *= k
-				var dep := deposits[i]
+				var dep := resources[i]
 				if dep >= 0 and _deposit_rgb[dep * 4 + 3] > 0.0:
 					r = lerpf(r, _deposit_rgb[dep * 4], 0.65)
 					g = lerpf(g, _deposit_rgb[dep * 4 + 1], 0.65)

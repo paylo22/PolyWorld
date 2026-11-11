@@ -10,6 +10,11 @@ func test_size_and_defaults(t) -> void:
 	t.eq(w.heights.size(), 7000, "слой высот")
 	t.eq(w.biomes[0], WorldData.NONE, "биом пустой")
 	t.eq(w.owners[6999], WorldData.NONE, "владельца нет")
+	t.eq(w.floras[10], WorldData.NONE, "флоры нет")
+	t.eq(w.resources[10], WorldData.NONE, "жилы нет")
+	t.eq(w.building_ids[10], WorldData.NONE, "здания нет")
+	t.eq(w.flags[10], 0, "флагов нет")
+	t.eq(WorldData.LAYERS.size(), 8, "7 слоёв правила 3 + flags")
 	t.eq(w.chunks_x, 2, "чанков по x (100/64 вверх)")
 	t.eq(w.zones_y, 9, "зон по y (70/8 вверх)")
 
@@ -55,12 +60,18 @@ func test_dirty_chunks(t) -> void:
 	t.eq(w.take_dirty_chunks(), PackedInt32Array([0]), "правка внутри чанка — только он")
 	w.set_value("height", 64, 10, 5)
 	t.eq(w.take_dirty_chunks(), PackedInt32Array([0, 1]), "правка на краю — и сосед (тень и кромка)")
+	w.mark_all_dirty()
+	t.eq(w.take_dirty_chunks(4).size(), 4, "за раз не больше 4 чанков")
+	t.ok(w.has_dirty_chunks(), "остальные ждут следующего кадра")
+	t.eq(w.take_dirty_chunks().size(), w.chunk_count() - 4, "потом отдаются остальные")
 	t.eq(w.chunk_rect(w.chunk_count() - 1), Rect2i(192, 128, 8, 2), "последний чанк обрезан")
 
 
 func test_dict_roundtrip_and_errors(t) -> void:
 	var a := WorldData.new(12, 9)
-	a.set_value("deposit", 1, 1, 3)
+	a.set_value("resource", 1, 1, 3)
+	a.set_value("flora", 5, 5, 1)
+	a.set_value("building_id", 6, 6, 7)
 	a.set_value("flags", 2, 2, WorldData.FLAG_RIVER)
 	var b := WorldData.new()
 	t.eq(b.from_dict(a.to_dict()), "", "загрузка без ошибки")
@@ -69,3 +80,17 @@ func test_dict_roundtrip_and_errors(t) -> void:
 	var bad := a.to_dict()
 	bad["layers"]["height"] = PackedInt32Array([1, 2])
 	t.has_text(b.from_dict(bad), "world.layers.height", "неверный размер слоя")
+
+
+func test_old_save_without_layers_opens(t) -> void:
+	# Как старое сохранение, где слоёв flora и building_id ещё не было (правило 12).
+	var a := WorldData.new(10, 10)
+	a.set_value("height", 2, 3, 400)
+	var d := a.to_dict()
+	d["layers"].erase("flora")
+	d["layers"].erase("building_id")
+	var b := WorldData.new()
+	t.eq(b.from_dict(d), "", "загрузка без ошибки")
+	t.eq(b.get_height(2, 3), 400, "высота на месте")
+	t.eq(b.floras[0], WorldData.NONE, "flora по умолчанию -1")
+	t.eq(b.building_ids[99], WorldData.NONE, "building_id по умолчанию -1")

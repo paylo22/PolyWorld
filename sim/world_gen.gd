@@ -488,7 +488,7 @@ func _stage_deposits() -> void:
 	var n := world.cell_count()
 	var heights := world.heights
 	var flags := world.flags
-	var deposits := world.deposits
+	var resources := world.resources
 	var mount_h: int = _cfg["mountain_height"]
 	var hills_h: int = _cfg["hills_height"]
 
@@ -519,7 +519,7 @@ func _stage_deposits() -> void:
 		var cur := mountain_cells[_rng.randi_range(0, mountain_cells.size() - 1)]
 		var size := _rng.randi_range(_cfg["vein_size_min"], _cfg["vein_size_max"])
 		for s in size:
-			deposits[cur] = res
+			resources[cur] = res
 			var d: Vector2i = WorldData.DIRS8[_rng.randi_range(0, 7)]
 			var nx := cur % w + d.x
 			var ny := cur / w + d.y
@@ -533,8 +533,8 @@ func _stage_deposits() -> void:
 	if clay >= 0:
 		for i in n:
 			var dr := _river_dist[i]
-			if dr > 0 and dr <= cr and heights[i] >= 0 and heights[i] < hills_h and deposits[i] < 0:
+			if dr > 0 and dr <= cr and heights[i] >= 0 and heights[i] < hills_h and resources[i] < 0:
 				if _rng.randf() < chance:
-					deposits[i] = clay
-	world.deposits = deposits
+					resources[i] = clay
+	world.resources = resources
 	world.flags = flags
