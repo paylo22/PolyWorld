@@ -1,0 +1,40 @@
+{
+  "_comment": "Ресурсы и хранилища. Источник: docs/RESEARCH.md, раздел «Ресурсы». Числа — стартовый баланс. Ключи с _ игнорируются.",
+  "storages": [
+    { "id": "granary", "name": "Амбар", "capacity": 400, "note": "еда; каменный ×1,5, кирпичный ×2" },
+    { "id": "warehouse", "name": "Склад", "capacity": 500, "note": "материалы; каменный ×1,5, кирпичный ×2" },
+    { "id": "arsenal", "name": "Арсенал", "capacity": 200, "note": "оружие и ядра" },
+    { "id": "powder_magazine", "name": "Пороховой погреб", "capacity": 150, "note": "может взорваться (радиус 4)" },
+    { "id": "stable", "name": "Конюшня", "note": "вместимость задаётся на этапе построек" },
+    { "id": "treasury", "name": "Казна", "capacity": -1, "note": "без предела" }
+  ],
+  "resources": [
+    { "id": "grain", "name": "Зерно", "type": "food_raw", "storage": "granary", "source": "ферма", "uses": "мельница, корм коням, пивоварня" },
+    { "id": "flour", "name": "Мука", "type": "intermediate", "storage": "granary", "source": "мельница", "uses": "пекарня" },
+    { "id": "bread", "name": "Хлеб", "type": "food", "storage": "granary", "source": "пекарня", "uses": "жители, солдаты" },
+    { "id": "meat", "name": "Мясо", "type": "food", "storage": "granary", "spoils": true, "source": "охотник, скотный двор", "uses": "жители, солдаты" },
+    { "id": "fish", "name": "Рыба", "type": "food", "storage": "granary", "source": "рыбацкая хижина, рыбацкие суда", "uses": "жители, моряки" },
+    { "id": "salt", "name": "Соль", "type": "raw", "storage": "warehouse", "source": "солеварня", "uses": "солонина (еда не портится), торговля" },
+    { "id": "beer", "name": "Пиво", "type": "luxury", "storage": "warehouse", "source": "пивоварня", "uses": "счастье, таверна" },
+    { "id": "wine", "name": "Вино", "type": "luxury", "storage": "warehouse", "source": "винодельня", "uses": "счастье, таверна, дорогой товар" },
+    { "id": "wood", "name": "Дерево (бревно)", "type": "raw", "storage": "warehouse", "source": "лесоруб", "uses": "лесопилка, угольная яма, простые постройки" },
+    { "id": "planks", "name": "Доски", "type": "material", "storage": "warehouse", "source": "лесопилка", "uses": "здания, корабли, лафеты пушек" },
+    { "id": "stone", "name": "Камень", "type": "raw", "storage": "warehouse", "source": "каменоломня", "uses": "каменные здания, стены, ядра" },
+    { "id": "clay", "name": "Глина", "type": "raw", "storage": "warehouse", "source": "глиняный карьер", "uses": "кирпичный завод, гончарня" },
+    { "id": "brick", "name": "Кирпич", "type": "material", "storage": "warehouse", "source": "кирпичный завод", "uses": "кирпичные здания, бастионы" },
+    { "id": "coal", "name": "Уголь", "type": "fuel", "storage": "warehouse", "source": "угольная яма, шахта", "uses": "плавильня, кузница, кирпич, порох" },
+    { "id": "iron_ore", "name": "Железная руда", "type": "raw", "storage": "warehouse", "source": "шахта", "uses": "плавильня" },
+    { "id": "iron", "name": "Железо", "type": "material", "storage": "warehouse", "source": "плавильня", "uses": "оружие, доспехи, пушки, инструменты" },
+    { "id": "tools", "name": "Инструменты", "type": "goods", "storage": "warehouse", "source": "кузница", "uses": "+скорость добычи, стройка" },
+    { "id": "weapons", "name": "Оружие (пики, мечи, луки)", "type": "military", "storage": "arsenal", "source": "оружейная", "uses": "найм отрядов" },
+    { "id": "muskets", "name": "Мушкеты", "type": "military", "storage": "arsenal", "source": "оружейная (ур. 4)", "uses": "мушкетёры" },
+    { "id": "saltpeter", "name": "Селитра", "type": "raw", "storage": "warehouse", "source": "селитряница (болото, конюшни)", "uses": "порох" },
+    { "id": "sulfur", "name": "Сера", "type": "raw", "storage": "warehouse", "source": "серный рудник (горы)", "uses": "порох" },
+    { "id": "gunpowder", "name": "Порох", "type": "military", "storage": "powder_magazine", "source": "пороховая мануфактура", "uses": "выстрелы мушкетов и пушек" },
+    { "id": "cannonballs", "name": "Ядра", "type": "military", "storage": "arsenal", "source": "литейный двор", "uses": "пушки, башни, корабли" },
+    { "id": "horses", "name": "Лошади", "type": "living", "storage": "stable", "source": "конюшня", "uses": "кавалерия, тяга пушек, обозы" },
+    { "id": "wool", "name": "Шерсть", "type": "goods", "storage": "warehouse", "source": "овчарня", "uses": "ткацкая" },
+    { "id": "cloth", "name": "Ткань", "type": "goods", "storage": "warehouse", "source": "ткацкая", "uses": "паруса, одежда, торговля" },
+    { "id": "gold", "name": "Золото", "type": "money", "storage": "treasury", "source": "налоги, торговля, золотой рудник", "uses": "жалованье, стройка, дипломатия" }
+  ]
+}
